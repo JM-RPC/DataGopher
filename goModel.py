@@ -278,10 +278,10 @@ class RegressionApp(tk.Toplevel):
         tk.Label(self.grp3d, text="Plot residuals against:").grid(row=3, column=0)
         self.residualmenu = tk.OptionMenu(self.grp3d, self.clickedResidX, ['-'], command=self.doresidual)
         self.residualmenu.grid(row=3, column=1, columnspan=2)
-        tk.Label(self.grp3d, text="Plot predictions against:").grid(row=4, column=0)
+        tk.Label(self.grp3d, text="Plot fitted values against:").grid(row=4, column=0)
         self.predictmenu = tk.OptionMenu(self.grp3d, self.clickedPredictX, ['-'], command=self.dopredict)
         self.predictmenu.grid(row=4, column=1, columnspan=2)
-        tk.Label(self.grp3d, text="Show fit against:").grid(row=5, column=0)
+        tk.Label(self.grp3d, text="Fitted and Actual against:").grid(row=5, column=0)
         self.dependentmenu = tk.OptionMenu(self.grp3d, self.clickedDependentX, ['-'], command=self.showFit)
         self.dependentmenu.grid(row=5, column=1, columnspan=2)
         self.mf3.pack_forget()
@@ -611,7 +611,7 @@ class RegressionApp(tk.Toplevel):
                 line.set_markersize(dsize) # Set desired marker size
 
         #plt.ylabel(ylabstr)
-        #plt.show()
+        plt.show()
         return
     
     def dopredict(self, *args):
@@ -639,6 +639,7 @@ class RegressionApp(tk.Toplevel):
         plt.ylabel(ylabstr)
         plt.show()
         return
+    
     def doresidual(self, *args):
         xvresid = self.clickedResidX.get()
         if (xvresid == '') or (xvresid == '-'): return
