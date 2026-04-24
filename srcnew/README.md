@@ -15,4 +15,6 @@ The "Pivot Data" button offers  a spreadsheet style pivot table capability (and 
 
 The application keeps a running log of everything you've done.   If you want to preserve this log, the "Save Log" button is the button for you.
 
+DataGopher will also produce python code in a stand (almost) alone script that will reproduce the plots and analysis done in the current session.  Clicking on "Save Code" will ask you for a file path and name or will put in sensible defaults.  Running the script will require access to the helper file modelgrph.py.  Move a copy of this file into the directory in which the script in saved.   This feature is still is still pretty new.  
+
 The right-most button, labeled "Graceful Exit", does exactly what it says.  It shuts down the DataGopher app and cleans up all remaining windows.
