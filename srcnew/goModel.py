@@ -594,18 +594,18 @@ class RegressionApp(tk.Toplevel):
             #add model graphics to generated code
             gdata.code_It('#### Model Graphics Options (comment or uncomment as needed)####')
             if imdl.model_type in ['LOGIT', 'PROBIT']:
-                gdata.code_It("mgrph.doroc(res)")
-                gdata.code_It("mgrph.dopredictbin(res)")
-                gdata.code_It("mgrph.doresidual(res = res, mtype = 'GLM')")
-                gdata.code_It("mgrph.modelplot(res, depvar = depvar,indvars = indvars)")
+                gdata.code_It("grp.doroc(res)")
+                gdata.code_It("grp.dopredictbin(res,xnames=[])")
+                #gdata.code_It("grp.doresidual(res = res, mtype = 'GLM')")
+                gdata.code_It("grp.modelplot(res, depvar = depvar,indvars = indvars)")
             elif imdl.model_type == 'OLS': 
-                gdata.code_It("mgrph.dopredict(res)")
-                gdata.code_It("mgrph.doresidual(res = res, mtype = 'OLS')")
-                gdata.code_It("mgrph.modelplot(res, depvar = depvar,indvars = indvars)")
+                gdata.code_It("grp.dopredict(res, xnames = [])")
+                gdata.code_It("grp.doresidual(res = res, mtype = 'OLS', xnames = [])")
+                gdata.code_It("grp.modelplot(res, depvar = depvar,indvars = indvars)")
             else: #it' GLM but not a binary dependent variable
-                gdata.code_It("mgrph.dopredict(res)")
-                gdata.code_It("mgrph.doresidual(res = res, mtype = 'GLM')")
-                gdata.code_It("mgrph.modelplot(res, depvar = depvar,indvars = indvars)")
+                gdata.code_It("grp.dopredict(res, xnames = [])")
+                gdata.code_It("grp.doresidual(res = res, mtype = 'GLM')")
+                gdata.code_It("grp.modelplot(res, depvar = depvar,indvars = indvars)")
                 
                 
             gdata.code_It('################################################################')
@@ -802,7 +802,7 @@ class RegressionApp(tk.Toplevel):
         else:
             messagebox.showerror(' ',"I can only graph models with one or two independent variables.")    
             return
-        xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1 = grp.doTrend()
+        xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1 = grp.doTrend(imdl.modelres, imdl.depvar, list(imdl.indvars))
         dsize = float(self.gpen.get())
         if len(imdl.indvars)==1:
             fig = plt.figure(figsize = (8,8)) 

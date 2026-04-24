@@ -33,8 +33,24 @@ from statsmodels.graphics.regressionplots import plot_partregress_grid, plot_lev
 from patsy import dmatrices, dmatrix, NAAction
 import seaborn as sb
 from sklearn.metrics import roc_curve, auc
-import modelgrph as mgrph
+import Graphics as grp
 import sys
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+from scipy.interpolate import griddata
+
+
+HAVELOESS2D = False
+emsg = ''
+loess_msg = "LOESS_2D routine of Cappellari et al. (2013b), which implements the multivariate LOESS algorithm of Cleveland & Devlin (1988)"
+try:
+    from loess.loess_2d import loess_2d
+    HAVELOESS2D = True
+except ImportError:
+    emsg = "Non-fatal Warning: loess.loess_2d package not installed.  Loess smoothing for 3D plots will not be available."
+    print(emsg)
+    emsg = "install from: https://pypi.org/project/loess/  using pip install loess in your environment."
+    print(emsg)
 
 
 

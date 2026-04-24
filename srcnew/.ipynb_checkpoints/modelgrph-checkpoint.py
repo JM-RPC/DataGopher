@@ -3,7 +3,7 @@ from pandas.api.types import is_numeric_dtype
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-matplotlib.use('TkAgg')
+#matplotlib.use('TkAgg')
 import numpy as np
 import statsmodels.api  as sm
 import statsmodels.formula.api as smf 
@@ -60,8 +60,14 @@ def doroc(MODEL = None):
     #plt.show() #show plots one at a time
     return
 
-def dopredictbin(res = None):
+def dopredictbin(res = None, xnames = []):
+    #if no exnames is given do all prediction plots
     if res is None: return
+    if len(xnames) > 0:
+        xvpredictlist = xnames
+    else:
+        #xvpredictlist = list(res.model.exog_names)
+        return
     xvpredictlist = list(res.model.exog_names)
     cvpredict = res.model.endog
     tstr = res.model.formula
@@ -89,8 +95,13 @@ def dopredictbin(res = None):
         #plt.show() #show plots one at a time
     return
 
-def dopredict(res = None):
+def dopredict(res = None, xnames = []):
     if res is None: return
+    if len(xnames) > 0:
+        xvpredictlist = xnames
+    else:
+        #xvpredictlist = list(res.model.exog_names)
+        return
     xvpredictlist = list(res.model.exog_names)
     tstr = res.model.formula
     depvar = res.model.endog
@@ -99,7 +110,6 @@ def dopredict(res = None):
     res_frame= prediction_res.summary_frame(alpha = 0.05)
     ylabstr = "Est. Mean Response"
     for idx,xvpredict in enumerate(xvpredictlist):
-        if idx == 0: continue
         fig, ax = plt.subplots() 
         sb.scatterplot(ax = ax, x = res.model.exog[:,idx], y = depvar, color = 'blue',label = 'Observed', s= dsize)
         sb.scatterplot(ax = ax, x = res.model.exog[:,idx], y = res_frame['mean'], color = 'red',label = 'Predicted', s = dsize)
@@ -111,8 +121,13 @@ def dopredict(res = None):
         #plt.show() #show plots one at a time
     return
 
-def doresidual(res = None, mtype = 'OLS'):
+def doresidual(res = None, mtype = 'OLS', xnames = []):
     if res == None: return
+    if len(xnames) > 0:
+        xvresidlist = xnames
+    else:
+        #xvresidlist = list(res.model.exog_names)
+        xvresidlist = ['-']
     tstr = res.model.formula
     xvresidlist = list(res.model.exog_names)
     #change xvresidlist to any subset of exog_names 

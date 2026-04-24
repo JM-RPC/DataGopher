@@ -57,6 +57,7 @@ class goStat(tk.Tk):
     def __init__(self):
         super().__init__()
         
+        
         self.title("Data Gopher")
         self.geometry("900x50+0+0") 
 
