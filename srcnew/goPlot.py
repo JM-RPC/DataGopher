@@ -1570,6 +1570,7 @@ color_variable = False"""
 ###################
 ##    3D Surface Plotting Code for {zv} with surface style {zstyl} 
 #       and line estimator/smoother {ltemp}
+gridsize = {gridsize} # number of grid points in x and y for surface prediction
 xin = np.array(df['{xv}'])
 yin = np.array(df['{yv}'])
 zin = np.array(df['{zv}'])
