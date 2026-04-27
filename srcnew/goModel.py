@@ -68,27 +68,7 @@ basecolorsalpha = ['red',  'blue', 'green', 'goldenrod', 'violet', 'yellow','gre
 basecolors = [matplotlib.colors.to_rgba(item,alpha = None) for item in basecolorsalpha]
 protected_names = ['Residuals','Predictions','Deviance_Resid']
     
-# def getcolor(cvar, col_data):
-#     #dfc = pd.DataFrame(col_data).astype('str')
-#     dfc = pd.DataFrame(col_data)
-#     #choicesCo = list(dfc[dfc.columns[0]].astype('str').unique())
-#     #choicesCo.sort()
-#     choicesCo = list(dfc[dfc.columns[0]].unique())
-#     choicesCo.sort()
-#     #choicesCo_str = [str(item) for item in choicesCo]
-#     if (len(choicesCo) < len(basecolors0)):
-#         colorD = {item : basecolors0[choicesCo.index(item)]  for item in choicesCo}
-#         colorlist = [colorD[item] for item in col_data]
-#         lpatches = [mpatches.Patch(color = colorD[item],label = cvar + ', ' + str(item)) for item in colorD.keys()]
-#     else:
-#         cmap = plt.cm.plasma
-#         #colorNos = [choicesCo.index(item) for item in col_data]
-#         colorD = {item : cmap(choicesCo.index(item)/len(choicesCo)) for item in choicesCo}
-#         colorlist = [colorD[item] for item in col_data]
-#         lpatches = [mpatches.Patch(color = colorD[item],label = cvar +  ', ' + str(item)) for item in choicesCo]
-#         #patch = mpatches.Patch(color = colorD[item], label = cv + ', ' + str(item))
-#     return colorD, colorlist, lpatches
- 
+
 
 class mdlStack():
     def __init__(self):
@@ -107,25 +87,11 @@ class mdlStack():
         self.dvar_stack = []
         self.stack_level = -1
         
-# df = imdl.inputdata        
-#mstk = mdlStack()
-# modelvars = list(df.columns)
-# modelvars.insert(0,'-')
-# gphvars = modelvars
-# mdl_res = None
-# res = None
-# rlog = None
 
 mtypes = ['OLS', 'GAMMA', 'LOGIT', 'PROBIT', 'POISSON', 'NEGATIVE BINOMIAL']
 
 
-# links = {'GAMMA':['Inverse', 'Log', 'Identity', 'InversePower'],
-#          'POISSON':['Log', 'Identity', 'Sqrt'],
-#          'NEGATIVE_BINOMIAL': ['Log', 'Identity', 'Power', 'cloglog', 'NegativeBinomial'],
-#          'PROBIT': ['InverseNormal'],
-#          'LOGIT': ['Logit'],
-#          'OLS': ['Identity']
-#          }
+
 links = {'GAMMA':[ 'Log', 'Identity', 'InversePower'],
          'POISSON':['Log', 'Identity', 'Sqrt'],
          'NEGATIVE_BINOMIAL': ['Log', 'Identity', 'Power', 'CLogLog', 'NegativeBinomial'],
@@ -592,24 +558,7 @@ class RegressionApp(tk.Toplevel):
                 if (self.grp2d.winfo_ismapped()): self.grp2d.pack_forget()
                 
             #add model graphics to generated code
-            gdata.code_It('#### Model Graphics Options (comment or uncomment as needed)####')
-            if imdl.model_type in ['LOGIT', 'PROBIT']:
-                gdata.code_It("grp.doroc(res)")
-                gdata.code_It("grp.dopredictbin(res,xnames=[])")
-                #gdata.code_It("grp.doresidual(res = res, mtype = 'GLM')")
-                gdata.code_It("grp.modelplot(res, depvar = depvar,indvars = indvars)")
-            elif imdl.model_type == 'OLS': 
-                gdata.code_It("grp.dopredict(res, xnames = [])")
-                gdata.code_It("grp.doresidual(res = res, mtype = 'OLS', xnames = [])")
-                gdata.code_It("grp.modelplot(res, depvar = depvar,indvars = indvars)")
-            else: #it' GLM but not a binary dependent variable
-                gdata.code_It("grp.dopredict(res, xnames = [])")
-                gdata.code_It("grp.doresidual(res = res, mtype = 'GLM')")
-                gdata.code_It("grp.modelplot(res, depvar = depvar,indvars = indvars)")
-                
-                
-            gdata.code_It('################################################################')
-
+            gdata.code_It('#### Model Graphics Options (comment or uncomment as needed)####')              
         else:
             # emsg = "Model Fit Failed.  Check the log file,"
             # emsg += "\nmodel formula, model type, data."
@@ -671,78 +620,29 @@ class RegressionApp(tk.Toplevel):
         return
     
     def showFit(self, *args):
-        xvdependent = self.clickedDependentX.get()
-        if (xvdependent == '') or (xvdependent == '-'): return       
-
-        cvdependent = self.clickedGC.get()
-        dsize = float(self.gpen.get())/20.0
-        fig, ax = plt.subplots()
-        plot_fit(imdl.modelres, xvdependent, vlines = False, ax = ax, markersize=dsize)
-        for line in ax.lines:
-            if line.get_linestyle() == 'None' and line.get_marker() != 'None': # Identify scatter plot
-                line.set_markersize(dsize) # Set desired marker size
-
-        #plt.ylabel(ylabstr)
-        plt.show()
+        grp.showFit(res = imdl.modelres, xname = self.clickedDependentX.get(), colorvar = self.clickedGC.get(), dsize = 8.0 )
+        cstr = f"grp.showFit(res = res, xname = '{self.clickedDependentX.get()}', colorvar = '{self.clickedGC.get()}', dsize = 8.0 )"
+        gdata.code_It(cstr)
         return
     
     def dopredict(self, *args):
-        xvpredict = self.clickedPredictX.get()
-        if (xvpredict == '') or (xvpredict == '-'): return
-        cvpredict = self.clickedGC.get()
-        dsize = float(self.gpen.get())
-        prediction_res = imdl.modelres.get_prediction(transform = True)
-        res_frame= prediction_res.summary_frame(alpha = 0.05)
-        ylabstr = "Est. Mean Response"
-        #plt.clf()
-        fig, ax = plt.subplots()
-        if (cvpredict != '') and (cvpredict != '-'): 
-            sb.scatterplot(imdl.fitdata, ax= ax, x = xvpredict, y = res_frame['mean'], hue = cvpredict, palette = 'bright',s = dsize )
-        else:
-            sb.scatterplot(imdl.fitdata, ax = ax, x = xvpredict, y = res_frame['mean'], color = 'blue', s = dsize)
-        if imdl.model_type in ['LOGIT', 'PROBIT']:
-            plt.axhline(y=0, color='black', linestyle='-')
-            plt.axhline(y=0.2, color = 'black', linestyle = 'dashed',linewidth = 0.5)
-            plt.axhline(y=0.4, color = 'black', linestyle = 'dashed',linewidth = 0.5)
-            plt.axhline(y=0.5, color = 'black', linestyle = 'dotted',linewidth = 0.5)
-            plt.axhline(y=0.6, color = 'black', linestyle = 'dashed',linewidth = 0.5)
-            plt.axhline(y=0.8, color = 'black', linestyle = 'dashed',linewidth = 0.5)
-            plt.axhline(y=1.0, color = 'black', linestyle = '-',linewidth = 0.5)
-            plt.ylim((0, 1))
-        plt.ylabel(ylabstr)
-        plt.show()
+        grp.dopredict(res = imdl.modelres, xname = self.clickedPredictX.get(), colorvar = self.clickedGC.get(), dsize = 8.0 )
+        cstr = f"grp.dopredict(res = res, xname = '{self.clickedPredictX.get()}', colorvar = '{self.clickedGC.get()}', dsize = 8.0 )"
+        gdata.code_It(cstr)
         return
     
     def doresidual(self, *args):
         xvresid = self.clickedResidX.get()
-        if (xvresid == '') or (xvresid == '-'): return
-        #residlim = max(np.abs(imdl.fitdata['Residuals']))
-        cvresid = self.clickedGC.get()
-        dsize = float(self.gpen.get())
-        if imdl.model_type != 'OLS': #if it's not OLS it's GLM
-            vres = imdl.modelres.resid_deviance
-            ylabstr = 'Deviance Residual'
+        if xvresid == 'Predictions': 
+            xnms = None
         else:
-            vres = imdl.modelres.resid
-            ylabstr = 'Residual'
-        residlim = max(np.abs(vres))
-        fig, ax = plt.subplots()
-        #plt.clf()
-        if (cvresid != '') and (cvresid != '-'): 
-            sb.scatterplot(imdl.fitdata, x = xvresid, y = vres, hue = cvresid, palette = 'bright',s = dsize )
-        else:
-            sb.scatterplot(imdl.fitdata, x = xvresid, y = vres, color = 'blue', s = dsize)   
-        plt.axhline(y=0, color='black', linestyle='-')
-        plt.ylim((-residlim, residlim))
-        plt.ylabel(ylabstr)
-        plt.show()
+            xnms = xvresid
+        grp.doresidual(imdl.modelres, mtype = imdl.model_type, xname = xnms, 
+                    cvresid = self.clickedGC.get(), dsize = float(self.gpen.get()))
+        cstr=f"grp.doresidual(res = res, mtype = '{imdl.model_type}', xname = '{xnms}', cvresid = '{self.clickedGC.get()}', dsize = {float(self.gpen.get())})"
+        gdata.code_It(cstr) 
         return
-    
-    def doModelPlot(self, *args):
-        self.doresidual()
-        self.dopredict()
-        self.showFit()
-    
+     
     def doroc(self, *args):
         if (imdl.model_type not in  ['LOGIT', 'PROBIT']): 
             return
@@ -802,7 +702,7 @@ class RegressionApp(tk.Toplevel):
         else:
             messagebox.showerror(' ',"I can only graph models with one or two independent variables.")    
             return
-        xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1 = grp.doTrend(imdl.modelres, imdl.depvar, list(imdl.indvars))
+        xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1 = grp.doTrend(imdl.modelres, imdl.depvar, list(imdl.indvars),MTYPE=imdl.model_type)
         dsize = float(self.gpen.get())
         if len(imdl.indvars)==1:
             fig = plt.figure(figsize = (8,8)) 
@@ -859,9 +759,16 @@ class RegressionApp(tk.Toplevel):
             if (imdl.model_type == 'OLS') & (self.selected_pi.get() == 1):
                 ax.plot_surface(xvar,yvar,Pi_ub1, alpha = 0.2, color = 'magenta', edgecolor = 'grey')                
                 ax.plot_surface(xvar,yvar,Pi_lb1, alpha = 0.2, color = 'magenta', edgecolor = 'grey')                
-            fig.show()
+            fig.show()        
         else:
             return
+        cib=False
+        pib=False
+        if self.selected_ci.get() == 1: cib = True
+        if self.selected_pi.get() == 1: pib = True
+
+        cstr = f"grp.modelplot(res, depvar = '{imdl.depvar}', indvars = {list(imdl.indvars)},color_var = '{self.clickedGC.get()}', showCI = {cib}, showPI = {pib}, MTYPE = '{imdl.model_type}')"
+        gdata.code_It(cstr)
         return
     def exit_closing(self):
         plt.close('all')

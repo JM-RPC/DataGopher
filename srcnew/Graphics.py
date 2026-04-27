@@ -77,7 +77,7 @@ def getcolorM(col_data):
         colorD = {}
     return(cvar,colorD)     
 
-def doTrend(res, depvar, indvars):
+def doTrend(res, depvar, indvars, MTYPE = '-'):
     #calculates the data for plotting the fitted regression line 
     # or plane and confidence intervals for a model. 
     # Returns xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1
@@ -131,13 +131,13 @@ def doTrend(res, depvar, indvars):
     znew = res_frame['mean'].values.reshape(xvar.shape)    
     Ci_lb1 =  res_frame['mean_ci_lower'].values.reshape(xvar.shape)
     Ci_ub1 =  res_frame['mean_ci_upper'].values.reshape(xvar.shape)
-    #if (MTYPE == 'OLS'):
-    #     Pi_lb1 =  res_frame['obs_ci_lower'].values.reshape(xvar.shape)
-    #     Pi_ub1 =  res_frame['obs_ci_upper'].values.reshape(xvar.shape)
-    # else:
-    #     Pi_lb1 = []
-    #     Pi_ub1 = []
-    return xvar, yvar, znew, Ci_lb1, Ci_ub1, [], []
+    if (MTYPE == 'OLS'):
+        Pi_lb1 =  res_frame['obs_ci_lower'].values.reshape(xvar.shape)
+        Pi_ub1 =  res_frame['obs_ci_upper'].values.reshape(xvar.shape)
+    else:
+        Pi_lb1 = []
+        Pi_ub1 = []
+    return xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1
 
    
 ##########################  
@@ -163,82 +163,52 @@ def doroc(MODEL = None):
     #plt.show() #show plots one at a time
     return
 
-def dopredictbin(res = None, xnames = []):
-    #if no exnames is given do all prediction plots
-    if res is None: return
-    if len(xnames) > 0:
-        xvpredictlist = xnames
-    else:
-        #xvpredictlist = list(res.model.exog_names)
-        return
-    xvpredictlist = list(res.model.exog_names)
-    cvpredict = res.model.endog
-    tstr = res.model.formula
-    dsize = 8.0
-    prediction_res = res.get_prediction(transform = True)
-    res_frame= prediction_res.summary_frame(alpha = 0.05)
-    ylabstr = "Est. Mean Response"
- 
-    for idx,xvpredict in enumerate(xvpredictlist):
-        if idx == 0: continue
-        fig, ax = plt.subplots() 
-        sb.scatterplot(ax= ax, x = res.model.exog[:,idx], y = res_frame['mean'], hue = res.model.endog, palette = 'bright',s = dsize)
-        plt.axhline(y=0, color='black', linestyle='-')
-        plt.axhline(y=0.2, color = 'black', linestyle = 'dashed',linewidth = 0.5)
-        plt.axhline(y=0.4, color = 'black', linestyle = 'dashed',linewidth = 0.5)
-        plt.axhline(y=0.5, color = 'black', linestyle = 'solid',linewidth = 0.5)
-        plt.axhline(y=0.6, color = 'black', linestyle = 'dashed',linewidth = 0.5)
-        plt.axhline(y=0.8, color = 'black', linestyle = 'dashed',linewidth = 0.5)
-        plt.axhline(y=1.0, color = 'black', linestyle = '-',linewidth = 0.5)
-        plt.ylim((0, 1))
-        plt.ylabel(ylabstr)
-        plt.xlabel(xvpredict)
-        plt.title(tstr)
-        fig.show()  #show the plots simultaneously
-        #plt.show() #show plots one at a time
-    return
 
-def dopredict(res = None, xnames = []):
+def dopredict(res = None, xname = None, colorvar = '-', dsize = 8.0 ):
     if res is None: return
-    if len(xnames) > 0:
-        xvpredictlist = xnames
-    else:
-        #xvpredictlist = list(res.model.exog_names)
-        return
-    xvpredictlist = list(res.model.exog_names)
+    if xname == '-' or xname == '': return  
     tstr = res.model.formula
     depvar = res.model.endog
     dsize = 8.0
     prediction_res = res.get_prediction(transform = True)
     res_frame= prediction_res.summary_frame(alpha = 0.05)
     ylabstr = "Est. Mean Response"
-    for idx,xvpredict in enumerate(xvpredictlist):
-        fig, ax = plt.subplots() 
-        sb.scatterplot(ax = ax, x = res.model.exog[:,idx], y = depvar, color = 'blue',label = 'Observed', s= dsize)
-        sb.scatterplot(ax = ax, x = res.model.exog[:,idx], y = res_frame['mean'], color = 'red',label = 'Predicted', s = dsize)
-        #plt.ylim((0, 1))
-        plt.ylabel(ylabstr)
-        plt.xlabel(xvpredict)
-        plt.title(tstr)
-        fig.show()  #show the plots simultaneously
-        #plt.show() #show plots one at a time
+    fig, ax = plt.subplots() 
+    if colorvar == '-' or colorvar == '':
+        sb.scatterplot(ax = ax, x = res.model.data.frame[xname], y = res_frame['mean'], color = 'blue',label = 'Observed', s= dsize)
+    else:
+        sb.scatterplot(ax = ax, x = res.model.data.frame[xname], y = res_frame['mean'], hue = res.model.data.frame[colorvar], palette = 'bright', s= dsize)
+    #plt.ylim((0, 1))
+    plt.ylabel(ylabstr)
+    plt.xlabel(xname)
+    plt.title(tstr)
+    fig.show()  #show the plots simultaneously
+    #plt.show() #show plots one at a time
     return
 
-def doresidual(res = None, mtype = 'OLS', xnames = []):
+def showFit(res = None, xname = None, colorvar = '-', dsize = 8.0 ):
+    if xname is None: return
+    xvdependent = xname
+    if (xvdependent == '') or (xvdependent == '-'): return       
+    dsizenu = float(dsize)/20.0
+    fig, ax = plt.subplots()
+    plot_fit(res, xvdependent, vlines = False, ax = ax, markersize=dsizenu)
+    for line in ax.lines:
+        if line.get_linestyle() == 'None' and line.get_marker() != 'None': # Identify scatter plot
+            line.set_markersize(dsizenu) # Set desired marker size
+
+    #plt.ylabel(ylabstr)
+    plt.show()
+    return
+
+
+def doresidual(res = None, mtype = 'OLS', xname = None, cvresid = None, dsize = 8.0):
     if res == None: return
-    if len(xnames) > 0:
-        xvresidlist = ['-'] + xnames
-    else:
-        #xvresidlist = list(res.model.exog_names)
-        xvresidlist = ['-']
     tstr = res.model.formula
     #xvresidlist = list(res.model.exog_names)
-    #change xvresidlist to any subset of exog_names 
-    # that you want to plot residuals against. 
-    # The first one is always the intercept, so we 
-    # skip that one in the plotting loop below and 
-    # plot residuals against fitted values instead.
-    dsize = 8 #dot size
+    #xname is the x variable for the residual plot.  
+    # If it's not given, then the residuals will be 
+    # plotted against the predicted values.
     if mtype != 'OLS': #if it's not OLS it's GLM
         vres = res.resid_deviance
         ylabstr = 'Deviance Residual'
@@ -246,91 +216,36 @@ def doresidual(res = None, mtype = 'OLS', xnames = []):
         vres = res.resid
         ylabstr = 'Residual'
     residlim = max(np.abs(vres))
-    for idx, xvresid in enumerate(xvresidlist):
-        fig, ax = plt.subplots()
-        if idx == 0 :
-            prediction_res = res.get_prediction(transform = True)
-            res_frame= prediction_res.summary_frame(alpha = 0.05)            
+    fig, ax = plt.subplots()
+    if xname is None:
+        prediction_res = res.get_prediction(transform = True)
+        res_frame= prediction_res.summary_frame(alpha = 0.05)
+        if cvresid == None or cvresid == '-':           
             sb.scatterplot(ax=ax, x = res_frame['mean'], y = vres, color = 'blue', s = dsize)
-            plt.xlabel('Predicted ' + res.model.endog_names)
         else:
-            sb.scatterplot(ax=ax, x = res.model.exog[:,idx], y = vres, color = 'blue', s = dsize) 
-            plt.xlabel(xvresid)
-        plt.axhline(y=0, color='black', linestyle='-')
-        plt.ylim((-residlim, residlim))
-        plt.ylabel(ylabstr)
+            sb.scatterplot(ax=ax, x = res_frame['mean'], y = vres, hue = res.model.data.frame[cvresid], palette = 'bright', s = dsize)
+        plt.xlabel('Predicted ' + res.model.endog_names)
+    else:
+        fig, ax = plt.subplots()
+        if cvresid == None or cvresid == '-':
+            sb.scatterplot(ax=ax, x = res.model.data.frame[xname], y = vres, color = 'blue', s = dsize)
+        else:
+            sb.scatterplot(ax=ax, x = res.model.data.frame[xname], y = vres, hue = res.model.data.frame[cvresid], palette = 'bright', s = dsize)
+        plt.xlabel(xname)
+    plt.axhline(y=0, color='black', linestyle='-')
+    plt.ylim((-residlim, residlim))
+    plt.ylabel(ylabstr)
 
-        plt.title(tstr)
-        fig.show()  #show the plots simultaneously
+    plt.title(tstr)
+    fig.show()  #show the plots simultaneously
         #plt.show() #show plots one at a time
     return
 
 #############################
 #############################
 
-def doTrend(res, depvar, indvars):
-    #calculates the data for plotting the fitted regression line 
-    # or plane and confidence intervals for a model. 
-    # Returns xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1
-    fitdata = res.model.data.frame[[depvar] + indvars]
-    dfg = fitdata
-    cur_mdl = res
-    yv = depvar
-    #print(f"from doTrend indvars = {imdl.indvars}")
-    if len(indvars) == 1:
-        xv = list(indvars)[0]
-        yv = depvar
-        zv = '-'
-    elif len(indvars) == 2:
-        xv = list(indvars)[0]
-        yv = list(indvars)[1]
-        zv = depvar
-    else:
-        return
-    
-    #MTYPE = imdl.model_type
-   #set up the input data for the independent variables
-    sq = 0.00
-    gridcount = 25
-    if (xv != '-'):
-        deltax = dfg[xv].max() - dfg[xv].min()
-        xlo = dfg[xv].min() - sq*deltax
-        xup = dfg[xv].max() + sq*deltax
-    if (yv != '-'): 
-        deltay = dfg[yv].max() - dfg[yv].min()
-        ylo = dfg[yv].min() - sq*deltay
-        yup = dfg[yv].max() + sq*deltay
-    if (zv != '-'): #We are doing 3D
-        xvar, yvar = np.meshgrid(np.arange(xlo,xup,deltax/gridcount),np.arange(ylo, yup,deltay/gridcount))                
-        exog0 = pd.DataFrame({xv: xvar.ravel(), yv: yvar.ravel()}) 
-    else: #we are doing 2D
-        xvar = np.arange(xlo, xup, deltax/gridcount) 
-        yvar = []                      
-        exog0 = pd.DataFrame({xv : xvar})
-    #print(f"exog0 = {exog0.head()}")
 
-    #print(f"Current model: {cur_mdl.summary()}")
-    #MTYPE = imdl.model_type
-      
-    try:
-       res_predictions =cur_mdl.get_prediction(exog=exog0,transform = True)
-       res_frame = res_predictions.summary_frame(alpha = 0.05)
-    except Exception as er:
-        #print(f"...Predictions failed! {er}")
-        return [],[],[],[],[],[],[]
-   
-    znew = res_frame['mean'].values.reshape(xvar.shape)    
-    Ci_lb1 =  res_frame['mean_ci_lower'].values.reshape(xvar.shape)
-    Ci_ub1 =  res_frame['mean_ci_upper'].values.reshape(xvar.shape)
-    #if (MTYPE == 'OLS'):
-    #     Pi_lb1 =  res_frame['obs_ci_lower'].values.reshape(xvar.shape)
-    #     Pi_ub1 =  res_frame['obs_ci_upper'].values.reshape(xvar.shape)
-    # else:
-    #     Pi_lb1 = []
-    #     Pi_ub1 = []
-    return xvar, yvar, znew, Ci_lb1, Ci_ub1, [], []
-
-def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'True'):
+def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False', showPI = 'False', MTYPE = '-'):
     if depvar is None: return
     if indvars is None: return  
     fitdata = res.model.data.frame
@@ -344,7 +259,7 @@ def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'True'
         zv = depvar
     else:   
         return
-    xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1 = doTrend(res, depvar, indvars)
+    xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1 = doTrend(res, depvar, indvars, MTYPE = MTYPE)
     dsize = 8.0
     if len(indvars)==1:
         fig = plt.figure(figsize = (8,8)) 
@@ -362,6 +277,12 @@ def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'True'
         if showCI == 'True':
             sb.lineplot(dftemp, x = xv, y = Ci_lb1, ax = ax, color = 'green', linewidth = dsize/2)
             sb.lineplot(dftemp, x = xv, y = Ci_ub1, ax = ax, color = 'green', linewidth = dsize/2)
+        if showPI == 'True' and MTYPE == 'OLS':
+            sb.lineplot(dftemp, x = xv, y = Pi_lb1, ax = ax, color = 'cyan', linewidth = dsize/2)
+            sb.lineplot(dftemp, x = xv, y = Pi_ub1, ax = ax, color = 'cyan', linewidth = dsize/2)
+        plt.xlabel(xv)
+        plt.ylabel(zv)
+        plt.title(res.model.formula)
         fig.show()
     elif len(indvars) == 2:
         fig = plt.figure(figsize = (8,8))
@@ -387,12 +308,13 @@ def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'True'
                 handles.extend(lpatches)
                 ax.legend(handles = handles)
         
-        ax.plot_surface(xvar,yvar,znew, alpha = 0.8, color = 'cyan', edgecolor = 'grey')       
-        ax.plot_surface(xvar,yvar,Ci_ub1, alpha = 0.4, color ='goldenrod', edgecolor = 'grey')
-        ax.plot_surface(xvar,yvar,Ci_lb1, alpha = 0.4, color ='goldenrod', edgecolor = 'grey')            
-        # if (imdl.model_type == 'OLS') & (self.selected_pi.get() == 1):
-        #     ax.plot_surface(xvar,yvar,Pi_ub1, alpha = 0.2, color = 'magenta', edgecolor = 'grey')                
-        #     ax.plot_surface(xvar,yvar,Pi_lb1, alpha = 0.2, color = 'magenta', edgecolor = 'grey')                
+        ax.plot_surface(xvar,yvar,znew, alpha = 0.8, color = 'cyan', edgecolor = 'grey') 
+        if showCI:    
+            ax.plot_surface(xvar,yvar,Ci_ub1, alpha = 0.4, color ='goldenrod', edgecolor = 'grey')
+            ax.plot_surface(xvar,yvar,Ci_lb1, alpha = 0.4, color ='goldenrod', edgecolor = 'grey')            
+        if showPI and MTYPE == 'OLS':
+            ax.plot_surface(xvar,yvar,Pi_ub1, alpha = 0.2, color = 'magenta', edgecolor = 'grey')                
+            ax.plot_surface(xvar,yvar,Pi_lb1, alpha = 0.2, color = 'magenta', edgecolor = 'grey')                
         fig.show()
     else:
         return
