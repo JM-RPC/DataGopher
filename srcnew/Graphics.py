@@ -319,3 +319,42 @@ def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False
     else:
         return
     return
+
+def do_Report(res = None, model_string='', alpha = 0.05, model_type = "OLS"):
+    SSstr0 = "\n==============================================================================\n"
+    Sumstr = ''
+    ICstr = ''
+    if model_type == 'OLS':
+        ICstr = f"AIC = {res.aic}, BIC(dev) = {res.bic}  \n"
+        Sumstr = f"Model: {model_string} \n\n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1])  
+        Sumstr = Sumstr + SSstr0  +str(res.summary().tables[2])+ "\n" + ICstr
+        if res.model.k_constant == 0:
+            SSwarn = "Warning: No constant in model. Uncentered R2, SST, MST, etc. reported. "
+        else:
+            SSwarn = ""
+
+        SSstr = SSstr0 + SSwarn + SSstr0 + Sumstr + "\n"
+        SSstr = SSstr + SSstr0 + '\n' + 'Simple Analysis of Variance' + "\n"
+        anova_rep = sm.stats.anova_lm(res,typ=1)   
+        tsstemp = 0      
+        if res.model.k_constant == 0: 
+            tsstemp = res.uncentered_tss
+        else:
+            tsstemp = res.centered_tss
+
+        anova_rep['mean_sq'] = anova_rep['sum_sq'] / anova_rep['df']
+        row1 = pd.Series({'df': res.df_model, 'sum_sq': res.ess,'mean_sq': res.mse_model,'F': ' ','PR(>F)':' '},name = 'Regression')
+        row2 = pd.Series({'df': res.df_resid + res.df_model, 'sum_sq': tsstemp, 'mean_sq': res.mse_total, 'F': ' ','PR(>F)':' '},name = 'Total')
+        anova_rep.loc['Regression'] = row1
+        anova_rep.loc['Total'] = row2
+        anova_rep.replace(np.nan," ")
+        SSstr = SSstr + str(anova_rep[anova_rep.columns[0:len(anova_rep.columns)-2]][-3:]) + '\n' + SSstr0
+    else:
+        IC_str = f"AIC = {res.aic}, BIC(dev) = {res.bic} BIC(ll): {res.bic_llf} \n"
+        if res.model.k_constant == 0:
+            SSwarn = "Warning: No constant in model. This changes the interpretation, an may inflate apparent fit. "
+        else:
+            SSwarn = ""
+        Sumstr = f"Model: {model_string} \n\n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1]) +"\n"  + SSstr0 +"\n"+ IC_str
+        SSstr = SSstr0 + SSwarn + SSstr0 + Sumstr + SSstr0 + "\n"
+    return SSstr

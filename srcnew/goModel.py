@@ -3,8 +3,8 @@
 from patsy import dmatrices, NAAction
 from sklearn.metrics import roc_curve, auc
 from datetime import datetime
-#mport statsmodels.api  as sm
-#import statsmodels.formula.api as smf
+import statsmodels.api  as sm
+import statsmodels.formula.api as smf
 from statsmodels.graphics.regressionplots import plot_partregress_grid, plot_leverage_resid2, influence_plot, plot_fit
 
 import pandas as pd
@@ -67,7 +67,7 @@ basecolors0 = ['blue', 'red',  'green', 'yellow', 'magenta', 'cyan', 'violet',
 basecolorsalpha = ['red',  'blue', 'green', 'goldenrod', 'violet', 'yellow','grey','gold','magenta','coral']
 basecolors = [matplotlib.colors.to_rgba(item,alpha = None) for item in basecolorsalpha]
 protected_names = ['Residuals','Predictions','Deviance_Resid']
-    
+   
 
 
 class mdlStack():
@@ -512,18 +512,15 @@ class RegressionApp(tk.Toplevel):
             gdata.model_data = mdl_res.copy(deep = True)
 ####################################################################
 ####################################################################
+            #update the report window aka text_area
+            repstr = ''
 
-            if imdl.model_type in ['OLS']:
-                strbuf = "==============================================================================="
-                strdisclaimer = "Partition of sums of squares for OLS only valid when your model fits an intercept.  Check the report."
-                strss = f"SSE = {res.ssr} \nSSR = {res.centered_tss - res.ssr} \nSST = {res.centered_tss} \n"
-                se_str = f"Std. Err. of Regression: {np.sqrt(res.mse_resid)} \n" + strbuf +"\n"
-                anova_str = strbuf + "\n" + se_str + "\n" + strbuf +"\n" + strss + "\n" +strbuf + "\n" + strdisclaimer + "\n" +strbuf
-            else:
-                anova_str = ''
-            self.text_area.insert('1.0', '\n'+str(res.summary(alpha = imdl.sig_level)) + '\n' + anova_str)
-            gdata.log_It('\n'+str(res.summary(alpha = imdl.sig_level)) + '\n' + anova_str)
-            gdata.code_It(f"print(res.summary(alpha = {imdl.sig_level}))")
+            yhat = res.fittedvalues
+            repstr = grp.do_Report(res = res, model_string = imdl.model_string, alpha = imdl.sig_level, model_type = imdl.model_type)
+          
+            self.text_area.insert('1.0', '\n' + repstr)
+            gdata.log_It('\n'+str(repstr))
+            gdata.code_It(f"print(grp.do_Report(res = res, model_string = '{imdl.model_string}', alpha = {imdl.sig_level}, model_type = '{imdl.model_type}'))")
             #self.log_area.insert(tk.END, rlog)
             gphv = list(mdl_res.columns)
             #gphvars = [item for item in gphv if len(mdl_res[item].unique()) <= len(basecolors0)]
@@ -620,14 +617,14 @@ class RegressionApp(tk.Toplevel):
         return
     
     def showFit(self, *args):
-        grp.showFit(res = imdl.modelres, xname = self.clickedDependentX.get(), colorvar = self.clickedGC.get(), dsize = 8.0 )
-        cstr = f"grp.showFit(res = res, xname = '{self.clickedDependentX.get()}', colorvar = '{self.clickedGC.get()}', dsize = 8.0 )"
+        grp.showFit(res = imdl.modelres, xname = self.clickedDependentX.get(), colorvar = self.clickedGC.get(), dsize = float(self.gpen.get()) )
+        cstr = f"grp.showFit(res = res, xname = '{self.clickedDependentX.get()}', colorvar = '{self.clickedGC.get()}', dsize = {float(self.gpen.get())} )"
         gdata.code_It(cstr)
         return
     
     def dopredict(self, *args):
-        grp.dopredict(res = imdl.modelres, xname = self.clickedPredictX.get(), colorvar = self.clickedGC.get(), dsize = 8.0 )
-        cstr = f"grp.dopredict(res = res, xname = '{self.clickedPredictX.get()}', colorvar = '{self.clickedGC.get()}', dsize = 8.0 )"
+        grp.dopredict(res = imdl.modelres, xname = self.clickedPredictX.get(), colorvar = self.clickedGC.get(), dsize = float(self.gpen.get()) )
+        cstr = f"grp.dopredict(res = res, xname = '{self.clickedPredictX.get()}', colorvar = '{self.clickedGC.get()}', dsize = {float(self.gpen.get())} )"
         gdata.code_It(cstr)
         return
     
@@ -647,7 +644,7 @@ class RegressionApp(tk.Toplevel):
         if (imdl.model_type not in  ['LOGIT', 'PROBIT']): 
             return
         if (imdl.fitdata is None): return
-        
+        gdata.code_It("grp.doroc(MODEL=res)")
         prediction_res = imdl.modelres.get_prediction(transform = True)
         res_frame= prediction_res.summary_frame(alpha = 0.05)
 
