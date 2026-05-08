@@ -3,7 +3,7 @@
 """
 Created on Tue Oct 21 14:45:30 2025
 
-@author: John
+@author: Knucklehead
 """
 
 from datetime import datetime
@@ -198,6 +198,8 @@ class goPivot(tk.Toplevel):
         except Exception as er:
             messagebox.showerror(" ", "Pivot Error:" + str(er))
             return
+        gdata.code_It(f"pivot_table = pd.pivot_table(df, values={pvals}, index={prows}, columns={pcols}, aggfunc={pfuna}, margins = {domarg})")
+        gdata.code_It("print(pivot_table)")
         gdata.datatable = pivot_table
         self.pivFrame.do_display(PT = pivot_table)
 

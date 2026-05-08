@@ -3,7 +3,7 @@
 """
 Created on Wed Aug 27 21:49:03 2025
 
-@author: John
+@author: Knucklehead
 """
 
 from patsy import dmatrices, dmatrix, NAAction
@@ -32,8 +32,8 @@ def doDesign(MODEL_STRING = '', DATA = None, APPEND = True):
         MODEL_STRING += '- 1' #kill the intercept term in the resulting design matrix
     try:
         nudf = dmatrix(MODEL_STRING, data = DATA, return_type = 'dataframe', NA_action=NAAction(NA_types=[]))
-        #gdata.code_It(f"nudf = dmatrix({MODEL_STRING}, data=df, return_type = 'dataframe', NA_action = NAAction(NA_types=[])")
-        gdata.log_It(f"dmatrix({MODEL_STRING}, data=df, return_type = 'dataframe', NA_action = NAAction(NA_types=[])")
+        gdata.code_It(f"nudf = dmatrix('{MODEL_STRING}', data=df, return_type = 'dataframe', NA_action = NAAction(NA_types=[]))")
+        gdata.log_It(f"dmatrix({MODEL_STRING}, data=df, return_type = 'dataframe', NA_action = NAAction(NA_types=[]))")
         gdata.log_It(f" Resulting design matrix shape: {nudf.shape}")
     except Exception as er:
         emsg = f"Variable transformation failed {er}"
@@ -46,6 +46,7 @@ def doDesign(MODEL_STRING = '', DATA = None, APPEND = True):
         ynbool = messagebox.askyesno(" ",emsg)
         if ynbool:
             nudf.replace([np.inf, -np.inf], np.nan, inplace=True)
+            gdata.code_It("nudf.replace([np.inf, -np.inf], np.nan, inplace=True)")
         else:
             return None
     if APPEND:     #merge the new design matrix with the original data
@@ -53,8 +54,10 @@ def doDesign(MODEL_STRING = '', DATA = None, APPEND = True):
         newcols = list(nudf.columns)
         addcols = [item for item in newcols if item not in originalcols]
         dfout = pd.concat([DATA, nudf[addcols]], axis = 1)
+        gdata.code_It(f"dfout = pd.concat([df,nudf[{addcols}]],axis = 1)")
     else:
         dfout = nudf
+        gdata.code_It("dfout = nudf")
     return dfout
 
 
@@ -363,7 +366,7 @@ class dataRename(tk.Frame):
             messagebox.showerror("  ", "Sorry, that name is aready in use.  Try again.")
             return
         ##############Change the required master data and options in transformer  and filterer
-        gdata.log_It(f"data.rename(columns= {self.selected_variable.get()}: {self.vname.get()}, inplace = True)")
+        gdata.code_It("df.rename(columns= {" + f"'{self.selected_variable.get()}': '{self.vname.get()}'" + "}, inplace = True)")
         self.master.data.rename(columns = {self.selected_variable.get():self.vname.get()}, inplace = True)
         
         gdata.put_Data(self.master.data)
@@ -413,7 +416,7 @@ class dataTransform(tk.Frame):
         self.teq1.grid(row = 3, column = 0, columnspan=8, sticky = 'e',padx=10)
         
                
-    def run_dmatrices(self, *args):
+    def run_dmatrices(self, *args): 
         mstr = self.meqn.get()        
         gdata.log_It(f"doDesign(MODEL_STRING = {mstr}, Data = dataframe)")
         res = doDesign(MODEL_STRING = mstr, DATA = self.master.data, APPEND=True)  
@@ -424,6 +427,7 @@ class dataTransform(tk.Frame):
             #self.master.data = self.data.copy(deep = True) #move transformed data back to parent
             self.master.data = res.copy(deep=True)
             gdata.put_Data(self.master.data)
+            gdata.code_It("df = dfout.copy(deep=True)")
             
         #change the list options in the filter, transform, rename, and reform widgets   
 
@@ -562,7 +566,9 @@ class dataFilter(tk.Frame):
             #TODO: find a better way to keep the index in sync with choice list
             rowchoice = pd.Series(map(lambda x:str(x),self.data[filtervar])).isin(filterlist)
             rowchoice.index = self.data.index
+            gdata.code_It(f"rowchoice = pd.Series(map(lambda x:str(x), df['{filtervar}'])).isin({filterlist})")
             self.nudata = self.data.loc[rowchoice]
+            gdata.code_It("nudata = df.loc[rowchoice]")
             gdata.log_It(f"Filtering on: {filtervar} Permissable values: {','.join(filterlist)}")
 
         else:
@@ -578,9 +584,11 @@ class dataFilter(tk.Frame):
                
             if self.flt.in_or_out.get() == "Inside":
                 self.nudata = self.data.loc[((self.data[filtervar] >= filterlower) & (self.data[filtervar] <= filterupper))]
+                gdata.code_It(f"nudata = df.loc[((df['{filtervar}'] >= {filterlower}) & (df['{filtervar}'] <= {filterupper}))]")
                 gdata.log_It(f"Filtering on: {filtervar} accepting values between: {filterlower} to {filterupper} inclusive.")
             else:
                 self.nudata = self.data.loc[~((self.data[filtervar] >= filterlower) & (self.data[filtervar] <= filterupper))]
+                gdata.code_It(f"nudata = df.loc[~((df['{filtervar}'] >= {filterlower}) & (df['{filtervar}'] <= {filterupper}))]")
                 gdata.log_It(f"Filtering on: {filtervar} accepting values NOT between: {filterlower} and {filterupper} inclusive.")
 
                 
@@ -591,6 +599,7 @@ class dataFilter(tk.Frame):
                   
         self.master.dfrm.do_display(self.nudata)
         self.master.data = self.nudata.copy(deep = True)
+        gdata.code_It("df = nudata.copy(deep=True)")
         gdata.put_Data(self.nudata)
         self.master.broadcastData(self)
         #self.flt.destroy()
