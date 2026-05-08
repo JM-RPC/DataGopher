@@ -3,7 +3,7 @@
 """
 Created on Sat Oct  4 23:21:56 2025
 
-@author: John
+@author: Knucklehead
 """
 
 
@@ -56,7 +56,6 @@ def checkName(namestr):
 class goStat(tk.Tk):
     def __init__(self):
         super().__init__()
-        
         
         self.title("Data Gopher")
         self.geometry("900x50+0+0") 
@@ -284,10 +283,13 @@ class goStat(tk.Tk):
             if len(badnames) > 0: 
                 badnames_str = " ], [ ".join(badnames)
                 mstr  = "Found nonconforming variable names:\n" + "[" + badnames_str + "]\n"
-                mstr += "For best results change the variable names.\n"
-                mstr += "Or, you may proceed and use Q(\"variable name\") where needed.\n"
-                mstr += "Variable names may consist of letters, numbers and underscores, no\n"
-                mstr += "initial numerals, other symbols or included spaces."
+                mstr += "Variable names may consist of letters, numbers \nand underscores,"
+                mstr += "no initial numerals, other symbols or included spaces.  "
+                mstr += "Variables with non-conforming names may \nbe excluded from modelling and plotting.\n"
+                mstr += "\n You can fix the non-conforming names by renaming those \n variables with 'Wrangle Data' module,"
+                mstr += "saving the \nrenamed data and then reloading the data. \n"
+                mstr += "Or, you may proceed and take your chances....YOU HAVE BEEN WARNED...\n"
+ 
                 messagebox.showinfo(" ", mstr)
         else:
             messagebox.showinfo("Info","No file selected.")

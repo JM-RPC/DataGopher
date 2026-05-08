@@ -1,4 +1,10 @@
-# Refactored: Tkinter app as a class
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Aug 27 21:49:03 2025
+
+@author: Knucklehead and Copilot (for  refactoring)
+"""# Refactored: Tkinter app as a class
 
 from patsy import dmatrices, NAAction
 from sklearn.metrics import roc_curve, auc

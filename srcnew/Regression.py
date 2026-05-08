@@ -3,7 +3,7 @@
 """
 Created on Tue Apr  2 15:45:31
 
-@author: JM-RPC
+@author: Knucklehead
 """
 from tkinter import messagebox
 

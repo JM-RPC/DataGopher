@@ -3,7 +3,7 @@
 """
 Created on Tue Apr  2 15:45:31
 
-@author: JM-RPC
+@author: Knucklehead
 """    
 
 #import pdb; pdb.set_trace()
@@ -21,12 +21,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sb
 from mpl_toolkits.mplot3d import Axes3D
-#from shiny import App, Inputs, Outputs, Session, reactive, render, ui
-#from shiny.types import FileInfo
-#import shinywidgets
-#from shinywidgets import render_widget, output_widget
-#import plotly.graph_objs as go
-#import plotly.express as pltx
+
+
 import os
 import signal
 from datetime import datetime    
@@ -324,6 +320,7 @@ def do_Report(res = None, model_string='', alpha = 0.05, model_type = "OLS"):
     SSstr0 = "\n==============================================================================\n"
     Sumstr = ''
     ICstr = ''
+    SSstr = ''
     if model_type == 'OLS':
         ICstr = f"AIC = {res.aic}, BIC(dev) = {res.bic}  \n"
         Sumstr = f"Model: {model_string} \n\n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1])  
@@ -334,9 +331,16 @@ def do_Report(res = None, model_string='', alpha = 0.05, model_type = "OLS"):
             SSwarn = ""
 
         SSstr = SSstr0 + SSwarn + SSstr0 + Sumstr + "\n"
-        SSstr = SSstr + SSstr0 + '\n' + 'Simple Analysis of Variance' + "\n"
-        anova_rep = sm.stats.anova_lm(res,typ=1)   
-        tsstemp = 0      
+        #anova_rep_s = str(sm.stats.anova_lm(res,typ=2))
+        #SSstr = SSstr + SSstr0 + "ANOVA-2" + "\n" + anova_rep_s + SSstr0
+        anova_rep = sm.stats.anova_lm(res, typ=1)
+        anova_rep_s = str(anova_rep)   
+        SSstr = SSstr + SSstr0 + "ANOVA" + "\n" + anova_rep_s + SSstr0
+
+        SSstr = SSstr + SSstr0 + '\n' + 'Sums of Squares:' + "\n"
+
+        tsstemp = 0    
+
         if res.model.k_constant == 0: 
             tsstemp = res.uncentered_tss
         else:
@@ -352,7 +356,7 @@ def do_Report(res = None, model_string='', alpha = 0.05, model_type = "OLS"):
     else:
         IC_str = f"AIC = {res.aic}, BIC(dev) = {res.bic} BIC(ll): {res.bic_llf} \n"
         if res.model.k_constant == 0:
-            SSwarn = "Warning: No constant in model. This changes the interpretation, an may inflate apparent fit. "
+            SSwarn = "Warning: No constant in model. This changes the interpretation and may inflate reported fit. "
         else:
             SSwarn = ""
         Sumstr = f"Model: {model_string} \n\n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1]) +"\n"  + SSstr0 +"\n"+ IC_str

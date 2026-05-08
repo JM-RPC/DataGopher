@@ -3,7 +3,7 @@
 """
 Created on Tue Sep  2 09:06:58 2025
 
-@author: John
+@author: Knucklehead
 """
 
 # from patsy import dmatrices, NAAction

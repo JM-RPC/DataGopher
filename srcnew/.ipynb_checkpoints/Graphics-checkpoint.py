@@ -3,7 +3,7 @@
 """
 Created on Tue Apr  2 15:45:31
 
-@author: JM-RPC
+@author: Knucklehead
 """    
 
 #import pdb; pdb.set_trace()
@@ -21,17 +21,13 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sb
 from mpl_toolkits.mplot3d import Axes3D
-#from shiny import App, Inputs, Outputs, Session, reactive, render, ui
-#from shiny.types import FileInfo
-#import shinywidgets
-#from shinywidgets import render_widget, output_widget
-#import plotly.graph_objs as go
-#import plotly.express as pltx
+
+
 import os
 import signal
 from datetime import datetime    
 
-from Regression import imdl
+#from Regression import imdl
 
 LOGSTR = ''
 
@@ -77,29 +73,28 @@ def getcolorM(col_data):
         colorD = {}
     return(cvar,colorD)     
 
-
-def doTrend():
-    dfg = imdl.fitdata
-    cur_mdl = imdl.modelres
-    yv = imdl.depvar
+def doTrend(res, depvar, indvars, MTYPE = '-'):
+    #calculates the data for plotting the fitted regression line 
+    # or plane and confidence intervals for a model. 
+    # Returns xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1
+    fitdata = res.model.data.frame[[depvar] + indvars]
+    dfg = fitdata
+    cur_mdl = res
+    yv = depvar
     #print(f"from doTrend indvars = {imdl.indvars}")
-    if len(imdl.indvars) == 1:
-        xv = list(imdl.indvars)[0]
-        yv = imdl.depvar
+    if len(indvars) == 1:
+        xv = list(indvars)[0]
+        yv = depvar
         zv = '-'
-    elif len(imdl.indvars) == 2:
-        xv = list(imdl.indvars)[0]
-        yv = list(imdl.indvars)[1]
-        zv = imdl.depvar
+    elif len(indvars) == 2:
+        xv = list(indvars)[0]
+        yv = list(indvars)[1]
+        zv = depvar
     else:
         return
-    #res = imdl.modelres
-    MTYPE = imdl.model_type
-    #fig2 = plt.figure(figsize = (8,8))
-    #fig3 = imdl.fig3
-    #ax2 = imdl.ax2
-    #ax3 = imdl.ax3
-    #set up the input data for the independent variables
+    
+    #MTYPE = imdl.model_type
+   #set up the input data for the independent variables
     sq = 0.00
     gridcount = 25
     if (xv != '-'):
@@ -118,15 +113,13 @@ def doTrend():
         yvar = []                      
         exog0 = pd.DataFrame({xv : xvar})
     #print(f"exog0 = {exog0.head()}")
-    res = imdl.modelres
+
     #print(f"Current model: {cur_mdl.summary()}")
-    MTYPE = imdl.model_type
-    #res_predictions =cur_mdl.get_prediction(exog=exog0,transform = True)
-    #res_frame = res_predictions.summary_frame(alpha = imdl.sig_level)
+    #MTYPE = imdl.model_type
       
     try:
        res_predictions =cur_mdl.get_prediction(exog=exog0,transform = True)
-       res_frame = res_predictions.summary_frame(alpha = imdl.sig_level)
+       res_frame = res_predictions.summary_frame(alpha = 0.05)
     except Exception as er:
         #print(f"...Predictions failed! {er}")
         return [],[],[],[],[],[],[]
@@ -141,6 +134,231 @@ def doTrend():
         Pi_lb1 = []
         Pi_ub1 = []
     return xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1
+
    
-  
-   
+##########################  
+#Model Graphics Functions    
+##########################  
+def doroc(MODEL = None):
+    if (MODEL is None): return
+    prediction_res = MODEL.get_prediction(transform = True)
+    res_frame= prediction_res.summary_frame(alpha = 0.05)
+
+    fpr, tpr, thresholds = roc_curve(MODEL.model.endog, res_frame['mean']) 
+    roc_auc = auc(fpr, tpr)
+    fig = plt.figure(figsize = (8,8))
+    ax = fig.add_subplot()
+    ax.plot(fpr, tpr)
+    ax.plot([0, 1], [0, 1], 'k--')
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    ax.set_title(f"ROC: {MODEL.model.formula}, AUC={round(roc_auc,5)}")
+    fig.show()  #show the plots simultaneously
+    #plt.show() #show plots one at a time
+    return
+
+
+def dopredict(res = None, xname = None, colorvar = '-', dsize = 8.0 ):
+    if res is None: return
+    if xname == '-' or xname == '': return  
+    tstr = res.model.formula
+    depvar = res.model.endog
+    dsize = 8.0
+    prediction_res = res.get_prediction(transform = True)
+    res_frame= prediction_res.summary_frame(alpha = 0.05)
+    ylabstr = "Est. Mean Response"
+    fig, ax = plt.subplots() 
+    if colorvar == '-' or colorvar == '':
+        sb.scatterplot(ax = ax, x = res.model.data.frame[xname], y = res_frame['mean'], color = 'blue',label = 'Observed', s= dsize)
+    else:
+        sb.scatterplot(ax = ax, x = res.model.data.frame[xname], y = res_frame['mean'], hue = res.model.data.frame[colorvar], palette = 'bright', s= dsize)
+    #plt.ylim((0, 1))
+    plt.ylabel(ylabstr)
+    plt.xlabel(xname)
+    plt.title(tstr)
+    fig.show()  #show the plots simultaneously
+    #plt.show() #show plots one at a time
+    return
+
+def showFit(res = None, xname = None, colorvar = '-', dsize = 8.0 ):
+    if xname is None: return
+    xvdependent = xname
+    if (xvdependent == '') or (xvdependent == '-'): return       
+    dsizenu = float(dsize)/20.0
+    fig, ax = plt.subplots()
+    plot_fit(res, xvdependent, vlines = False, ax = ax, markersize=dsizenu)
+    for line in ax.lines:
+        if line.get_linestyle() == 'None' and line.get_marker() != 'None': # Identify scatter plot
+            line.set_markersize(dsizenu) # Set desired marker size
+
+    #plt.ylabel(ylabstr)
+    plt.show()
+    return
+
+
+def doresidual(res = None, mtype = 'OLS', xname = None, cvresid = None, dsize = 8.0):
+    if res == None: return
+    tstr = res.model.formula
+    #xvresidlist = list(res.model.exog_names)
+    #xname is the x variable for the residual plot.  
+    # If it's not given, then the residuals will be 
+    # plotted against the predicted values.
+    if mtype != 'OLS': #if it's not OLS it's GLM
+        vres = res.resid_deviance
+        ylabstr = 'Deviance Residual'
+    else:
+        vres = res.resid
+        ylabstr = 'Residual'
+    residlim = max(np.abs(vres))
+    fig, ax = plt.subplots()
+    if xname is None:
+        prediction_res = res.get_prediction(transform = True)
+        res_frame= prediction_res.summary_frame(alpha = 0.05)
+        if cvresid == None or cvresid == '-':           
+            sb.scatterplot(ax=ax, x = res_frame['mean'], y = vres, color = 'blue', s = dsize)
+        else:
+            sb.scatterplot(ax=ax, x = res_frame['mean'], y = vres, hue = res.model.data.frame[cvresid], palette = 'bright', s = dsize)
+        plt.xlabel('Predicted ' + res.model.endog_names)
+    else:
+        fig, ax = plt.subplots()
+        if cvresid == None or cvresid == '-':
+            sb.scatterplot(ax=ax, x = res.model.data.frame[xname], y = vres, color = 'blue', s = dsize)
+        else:
+            sb.scatterplot(ax=ax, x = res.model.data.frame[xname], y = vres, hue = res.model.data.frame[cvresid], palette = 'bright', s = dsize)
+        plt.xlabel(xname)
+    plt.axhline(y=0, color='black', linestyle='-')
+    plt.ylim((-residlim, residlim))
+    plt.ylabel(ylabstr)
+
+    plt.title(tstr)
+    fig.show()  #show the plots simultaneously
+        #plt.show() #show plots one at a time
+    return
+
+#############################
+#############################
+
+
+def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False', showPI = 'False', MTYPE = '-'):
+    if depvar is None: return
+    if indvars is None: return  
+    fitdata = res.model.data.frame
+    if len(indvars) == 1:
+        xv = list(indvars)[0]
+        yv = '-'
+        zv = depvar
+    elif len(indvars) == 2:
+        xv = list(indvars)[0]
+        yv = list(indvars)[1]
+        zv = depvar
+    else:   
+        return
+    xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1 = doTrend(res, depvar, indvars, MTYPE = MTYPE)
+    dsize = 8.0
+    if len(indvars)==1:
+        fig = plt.figure(figsize = (8,8)) 
+        ax = fig.add_subplot()
+        xv = list(indvars)[0]
+        zv = depvar
+        cv = color_var
+        if cv == '-':
+            sb.scatterplot(fitdata, x = xv, y = zv, ax = ax,s = dsize, color = 'black')
+        else:
+            sb.scatterplot(fitdata, x = xv, y= zv, ax = ax, s = dsize, hue = cv, palette = 'bright' )
+        dftemp = pd.DataFrame({xv:xvar, zv:znew})
+
+        sb.lineplot(dftemp, x = xv, y = zv, ax = ax, color = 'red', linewidth = dsize/2)
+        if showCI == 'True':
+            sb.lineplot(dftemp, x = xv, y = Ci_lb1, ax = ax, color = 'green', linewidth = dsize/2)
+            sb.lineplot(dftemp, x = xv, y = Ci_ub1, ax = ax, color = 'green', linewidth = dsize/2)
+        if showPI == 'True' and MTYPE == 'OLS':
+            sb.lineplot(dftemp, x = xv, y = Pi_lb1, ax = ax, color = 'cyan', linewidth = dsize/2)
+            sb.lineplot(dftemp, x = xv, y = Pi_ub1, ax = ax, color = 'cyan', linewidth = dsize/2)
+        plt.xlabel(xv)
+        plt.ylabel(zv)
+        plt.title(res.model.formula)
+        fig.show()
+    elif len(indvars) == 2:
+        fig = plt.figure(figsize = (8,8))
+        ax = fig.add_subplot(111, projection='3d')
+        xv = list(indvars)[0]
+        yv = list(indvars)[1]
+        zv = depvar
+        cv = '-'
+        xdat = fitdata[xv]
+        ydat = fitdata[yv]
+        zdat = fitdata[zv]
+        ax.set_xlabel(xv)
+        ax.set_ylabel(yv)
+        ax.set_zlabel(zv)
+        if (cv == '-') or (cv == ''):
+            ax.scatter(xdat, ydat, zdat ,marker='o', color = 'black', s = dsize)
+        else:
+            colordat = fitdata[cv]
+            colorD, colorlist ,lpatches= getcolor(cv,list(colordat))
+            ax.scatter(xdat, ydat, zdat ,marker='o', c = colorlist, s = dsize)
+            if colorD != {}:
+                handles , labels = ax.get_legend_handles_labels()
+                handles.extend(lpatches)
+                ax.legend(handles = handles)
+        
+        ax.plot_surface(xvar,yvar,znew, alpha = 0.8, color = 'cyan', edgecolor = 'grey') 
+        if showCI:    
+            ax.plot_surface(xvar,yvar,Ci_ub1, alpha = 0.4, color ='goldenrod', edgecolor = 'grey')
+            ax.plot_surface(xvar,yvar,Ci_lb1, alpha = 0.4, color ='goldenrod', edgecolor = 'grey')            
+        if showPI and MTYPE == 'OLS':
+            ax.plot_surface(xvar,yvar,Pi_ub1, alpha = 0.2, color = 'magenta', edgecolor = 'grey')                
+            ax.plot_surface(xvar,yvar,Pi_lb1, alpha = 0.2, color = 'magenta', edgecolor = 'grey')                
+        fig.show()
+    else:
+        return
+    return
+
+def do_Report(res = None, model_string='', alpha = 0.05, model_type = "OLS"):
+    SSstr0 = "\n==============================================================================\n"
+    Sumstr = ''
+    ICstr = ''
+    SSstr = ''
+    if model_type == 'OLS':
+        ICstr = f"AIC = {res.aic}, BIC(dev) = {res.bic}  \n"
+        Sumstr = f"Model: {model_string} \n\n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1])  
+        Sumstr = Sumstr + SSstr0  +str(res.summary().tables[2])+ "\n" + ICstr
+        if res.model.k_constant == 0:
+            SSwarn = "Warning: No constant in model. Uncentered R2, SST, MST, etc. reported. "
+        else:
+            SSwarn = ""
+
+        SSstr = SSstr0 + SSwarn + SSstr0 + Sumstr + "\n"
+        #anova_rep_s = str(sm.stats.anova_lm(res,typ=2))
+        #SSstr = SSstr + SSstr0 + "ANOVA-2" + "\n" + anova_rep_s + SSstr0
+        anova_rep = sm.stats.anova_lm(res, typ=1)
+        anova_rep_s = str(anova_rep)   
+        SSstr = SSstr + SSstr0 + "ANOVA" + "\n" + anova_rep_s + SSstr0
+
+        SSstr = SSstr + SSstr0 + '\n' + 'Sums of Squares:' + "\n"
+
+        tsstemp = 0    
+
+        if res.model.k_constant == 0: 
+            tsstemp = res.uncentered_tss
+        else:
+            tsstemp = res.centered_tss
+
+        anova_rep['mean_sq'] = anova_rep['sum_sq'] / anova_rep['df']
+        row1 = pd.Series({'df': res.df_model, 'sum_sq': res.ess,'mean_sq': res.mse_model,'F': ' ','PR(>F)':' '},name = 'Regression')
+        row2 = pd.Series({'df': res.df_resid + res.df_model, 'sum_sq': tsstemp, 'mean_sq': res.mse_total, 'F': ' ','PR(>F)':' '},name = 'Total')
+        anova_rep.loc['Regression'] = row1
+        anova_rep.loc['Total'] = row2
+        anova_rep.replace(np.nan," ")
+        SSstr = SSstr + str(anova_rep[anova_rep.columns[0:len(anova_rep.columns)-2]][-3:]) + '\n' + SSstr0
+    else:
+        IC_str = f"AIC = {res.aic}, BIC(dev) = {res.bic} BIC(ll): {res.bic_llf} \n"
+        if res.model.k_constant == 0:
+            SSwarn = "Warning: No constant in model. This changes the interpretation and may inflate reported fit. "
+        else:
+            SSwarn = ""
+        Sumstr = f"Model: {model_string} \n\n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1]) +"\n"  + SSstr0 +"\n"+ IC_str
+        SSstr = SSstr0 + SSwarn + SSstr0 + Sumstr + SSstr0 + "\n"
+    return SSstr

@@ -3,7 +3,7 @@
 """
 Created on Tue Oct 21 14:45:30 2025
 
-@author: John
+@author: Knucklehead
 """
 
 from datetime import datetime

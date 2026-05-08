@@ -3,7 +3,7 @@
 """
 Created on Sat Oct  4 23:21:56 2025
 
-@author: John
+@author: Knucklehead
 """
 
 

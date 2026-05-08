@@ -3,7 +3,7 @@
 """
 Created on Tue Sep  2 09:06:58 2025
 
-@author: John
+@author: Knucklehead
 """
 
 # from patsy import dmatrices, NAAction
@@ -928,6 +928,8 @@ class gPlot(tk.Frame):
         # print(f"Active columns: {', '.join(active_vars)}")
         df = self.master.master.data.copy(deep = True)
         gdata.code_It(" ")
+        gdata.code_It("################################")
+        gdata.code_It("## ")
 
         nobs0 = len(df)
         df.dropna(subset=active_vars, inplace = True)
@@ -1256,6 +1258,8 @@ class gPlot(tk.Frame):
         df.dropna(subset=active_vars, inplace = True)
         nobs = len(df)
         self.master.master.current_data = df #it's ok we don't need to copy the data 
+        gdata.code_It("################################")
+        gdata.code_It("## Code for 2D Scatter Plot Grid")
 
         #code to read data in (in log file) and check # rows in original and plotted data
         lstr0 = f"df = pd.read_csv('{gdata.fpath}',engine='python')"
@@ -1405,6 +1409,7 @@ class gPlot(tk.Frame):
         fig = plt.figure(figsize=(10, 10))
         ax = fig.add_subplot(111, projection='3d')
         str3d = """
+##### 3D Scatter Plotting Code #####
 fig = plt.figure(figsize=(10, 10))
 ax = fig.add_subplot(111, projection='3d')
 """
@@ -1424,12 +1429,13 @@ colorD = {}  # dictionary of cv values to colors
 lpatches = []  # legend patches
 cvpatches = []  # patches created from cv
 color_variable = False"""
+
         str3d = f"cv = '{cv}'\n" + str3d
         gdata.code_It(str3d)
 
         if cv != '-':
             colorD, colorlist, cvpatches = grp.getcolor(cv, list(df[cv]))
-            gdata.code_It(f"colorD, colorlist, cvpatches = getcolor(cv, list(df[cv]))")
+            gdata.code_It(f"colorD, colorlist, cvpatches = grp.getcolor(cv, list(df[cv]))")
 
         # initialize the z axis label
         zlab = ''
@@ -1459,7 +1465,7 @@ color_variable = False"""
             ltemp = zitem.gxlineest.get()
             # boolean True = show scatter False = don't
             showscatter = zitem.gxsmootherscatter.get()
-            # order for a polynomial smoothin (0 none, 1 OLS, 2 etc..)
+            # order for a polynomial smoothing (0 none, 1 OLS, 2 etc..)
             polyorder = int(zitem.gxpolysmootherorder.get())
             loessfrac = float(zitem.gxloessfrac.get())
             # ysmoother = zitem.gxsmoother.get()#   # smoother choice
@@ -1560,6 +1566,27 @@ color_variable = False"""
                 Z_predicted = np.empty_like(Ygf)
                 Z_predicted_reshaped = np.empty_like(Yg)
                 
+                cstr = f"""
+###################
+##    3D Surface Plotting Code for {zv} with surface style {zstyl} 
+#       and line estimator/smoother {ltemp}
+gridsize = {gridsize} # number of grid points in x and y for surface prediction
+xin = np.array(df['{xv}'])
+yin = np.array(df['{yv}'])
+zin = np.array(df['{zv}'])
+# create 2 1D input arrays
+xg = np.linspace({xin.min()}, {xin.max()}, {gridsize})
+yg = np.linspace({yin.min()}, {yin.max()}, {gridsize})
+# Use numpy.meshgrid to create the 2D grid arrays
+Xg, Yg = np.meshgrid(xg, yg)
+# use flatten to turn the 2d data arrays into two variables suitable for statsmodels
+Xgf = Xg.flatten()
+Ygf = Yg.flatten()
+Z_predicted = np.empty_like(Ygf)
+Z_predicted_reshaped = np.empty_like(Yg)
+"""
+                gdata.code_It(cstr)
+
                 #update the z bounds for graphing
 
                 zlb = float(zitem.gxlb.get())
@@ -1584,6 +1611,16 @@ color_variable = False"""
                     # Linear regression. note: intercept added to design matrix (input_features)
                     model = LinearRegression(fit_intercept=False)
                     model.fit(input_features, zin)
+                    cstr = f""" 
+poly = PolynomialFeatures(degree={polyorder})
+input_pts = np.stack([xin, yin]).T
+input_features = poly.fit_transform(input_pts)
+
+# Linear regression. note: intercept added to design matrix (input_features)
+model = LinearRegression(fit_intercept=False)
+model.fit(input_features, zin)
+"""
+                    gdata.code_It(cstr)
                     # log the coefficients and R2
                     # print(";".join(list(dict(zip(poly.get_feature_names_out(), model.coef_.round(4))))))
                     outdict = dict(
@@ -1612,68 +1649,130 @@ color_variable = False"""
                         x = Xg
                         y = Yg
                         z = Z_predicted_reshaped
+
+                    cstr = """
+# populate the prediction mesh
+# predictions
+input_pts_grid = np.stack([Xgf, Ygf]).T
+Z_predicted = model.predict(poly.transform(input_pts_grid))
+# z dimension grid points
+Z_predicted_reshaped = np.reshape(Z_predicted, Xg.shape)
+# we are now good good to go for a polynomial smoothing plot (surface or wire frame)
+# the variables are Xg, Yg, Z_predicted_reshaped
+"""
+                    gdata.code_It(cstr)
+                    if zstyl == 'triangulated':
+                        cstr = """
+x = Xgf
+y = Ygf
+z = Z_predicted"""
+                        gdata.code_It(cstr)
+                    else:
+                        cstr = """
+x = Xg
+y = Yg
+z = Z_predicted_reshaped"""
+                        gdata.code_It(cstr)
                 elif (ltemp == 'loess'):  
                     Z_predicted, wout = loess_2d(
                         x=xin, y=yin, z=zin, xnew=Xgf, ynew=Ygf, degree=1, frac=loessfrac)
                     Z_predicted_reshaped = np.reshape(Z_predicted, Xg.shape)
+                    cstr = f"""
+Z_predicted, wout = loess_2d(x=xin, y=yin, z=zin, xnew=Xgf, ynew=Ygf, degree=1, frac={loessfrac})
+Z_predicted_reshaped = np.reshape(Z_predicted, Xg.shape)"""                 
+                    gdata.code_It(cstr)
                     if zstyl == 'triangulated':
                         x = Xgf
                         y = Ygf
                         z = Z_predicted
+                        cstr = """
+x = Xgf
+y = Ygf
+z = Z_predicted"""
+                        gdata.code_It(cstr)
                     else:
                         x = Xg
                         y = Yg
                         z = Z_predicted_reshaped
+                        cstr = """
+x = Xg
+y = Yg
+z = Z_predicted_reshaped"""
+                        gdata.code_It(cstr)
                 elif ltemp == 'median' or ltemp == 'mean' or ltemp == 'None':
                     dfd = pd.DataFrame({'x': xin, 'y': yin, 'z': zin})
+                    gdata.code_It("dfd = pd.DataFrame({'x': xin, 'y': yin, 'z': zin})")
                     if ltemp == 'median':
-                        grouped = dfd.groupby(
-                            ['x', 'y']).median().reset_index()
+                        grouped = dfd.groupby(['x', 'y']).median().reset_index()
+                        gdata.code_It("grouped = dfd.groupby(['x', 'y']).median().reset_index()")
                     elif ltemp == 'mean':
                         grouped = dfd.groupby(['x', 'y']).mean().reset_index()
+                        gdata.code_It("grouped = dfd.groupby(['x', 'y']).mean().reset_index()")
                     else:
                         grouped = dfd
+                        gdata.code_It("grouped = dfd")
                     xi = np.array(grouped['x'])
                     yi = np.array(grouped['y'])
                     zi = np.array(grouped['z'])
                     Xi, Yi = np.meshgrid(xi, yi)
-                    Zi = griddata((xi, yi), zi, (Xi, Yi),
-                                  method='cubic')  # linear, nearest
+                    Zi = griddata((xi, yi), zi, (Xi, Yi), method='cubic')  # linear, nearest
+                    cst = """
+xi = np.array(grouped['x'])
+yi = np.array(grouped['y'])
+zi = np.array(grouped['z'])
+Xi, Yi = np.meshgrid(xi, yi)
+Zi = griddata((xi, yi), zi, (Xi, Yi), method='cubic')  # linear, nearest"""
+                    gdata.code_It(cst)
                     if zstyl == 'triangulated':
                         x = xi
                         y = yi
                         z = zi
+                        cstr = """
+x = xi
+y = yi
+z = zi"""
+                        gdata.code_It(cstr)
                     else:
                         x = Xi
                         y = Yi
                         z = Zi
+                        cstr = """
+x = Xi
+y = Yi
+z = Zi"""
+                        gdata.code_It(cstr)
             else:
                 continue
 
             # smoother plotting commands here ###########################################################################
             zsurf = None
             if zstyl == 'triangulated':
-                triangulatedplotparms = {
-                    'color': zcolor, 'label': zv, 'edgecolor': 'lightgrey', 'alpha': 0.5}
+                triangulatedplotparms = {'color': zcolor, 'label': zv, 'edgecolor': 'lightgrey', 'alpha': 0.5}
+                gdata.code_It(f"triangulatedplotparms = {{'color': '{zcolor}', 'label': '{zv}', 'edgecolor': 'lightgrey', 'alpha': 0.5}}")
                 try:
                     zsurf = ax.plot_trisurf(x, y, z, **triangulatedplotparms)
+                    gdata.code_It(f"zsurf = ax.plot_trisurf(x, y, z, **triangulatedplotparms)")
                 except Exception as er:
                     gdata.log_It(f" plot_trisurf() failed! Error:{er}")
                     tk.messagebox.showerror(
                         " ", f"Triangulated surface plot failed! Error:{er}")
                 # ax.plot_trisurf(x, y, z, color = zcolor, label = zv, edgecolor = 'lightgrey')
             elif zstyl == 'wireframe':
-                wireframeplotparms = {
-                    'color': 'lightgrey', 'label': zv, 'edgecolor': zcolor, 'alpha': 0.5}
+                wireframeplotparms = {'color': 'lightgrey', 'label': zv, 'edgecolor': zcolor, 'alpha': 0.5}
+                gdata.code_It(f"wireframeplotparms = {{'color': '{'lightgrey'}', 'label': '{zv}', 'edgecolor': '{zcolor}', 'alpha': 0.5}}")  
                 zsurf = ax.plot_wireframe(x, y, z, **wireframeplotparms)
+                gdata.code_It(f"zsurf = ax.plot_wireframe(x, y, z, **wireframeplotparms)")
                 # ax.plot_wireframe(x, y, z, color = 'lightgrey', label = zv, edgecolor = zcolor, alpha = 0.5)
             elif zstyl == 'surface':
-                surfaceplotparms = {'color': zcolor, 'label': zv,
-                                    'edgecolor': 'lightgrey', 'alpha': 0.5}
+                surfaceplotparms = {'color': zcolor, 'label': zv, 'edgecolor': 'lightgrey', 'alpha': 0.5}
+                gdata.code_It(f"surfaceplotparms = {{'color': '{zcolor}', 'label': '{zv}', 'edgecolor': 'lightgrey', 'alpha': 0.5}}")
                 zsurf = ax.plot_surface(x, y, z, **surfaceplotparms)
+                gdata.code_It(f"zsurf = ax.plot_surface(x, y, z, **surfaceplotparms)")
+    
                 # ax.plot_surface(x, y, z, color = zcolor, label = zv, edgecolor = 'lightgrey', alpha = 0.5)
             if zsurf is not None:
                 surface_legend_entries.extend([zsurf])
+                gdata.code_It("surface_legend_entries.extend([zsurf])")
             zlb = float(zitem.gxlb.get())
             zub = float(zitem.gxub.get())
     
@@ -1691,6 +1790,15 @@ color_variable = False"""
         ax.set_xlim(xlower, xupper)
         ax.set_ylim(ylower, yupper)
         ax.set_zlim(zlower, zupper)
+        cstr = f"""
+ax.set_xlabel('{xlab}')
+ax.set_ylabel('{ylab}')
+ax.set_zlabel('{zlab}')
+ax.set_title('{ctitle}')
+ax.set_xlim({xlower},{xupper})
+ax.set_ylim({ylower},{yupper})
+ax.set_zlim({zlower}, {zupper})"""
+        gdata.code_It(cstr)
         if colorlegend:
             lpatches = cvpatches + lpatches
             gdata.code_It("lpatches = cvpatches + lpatches")
@@ -1700,21 +1808,23 @@ color_variable = False"""
         ax.add_artist(scatter_legend)
         gdata.code_It("ax.add_artist(scatter_legend)")
         plt.legend(handles=surface_legend_entries, loc='upper left', title='Smoothings', bbox_to_anchor=(0.00, 1.05))
+        gdata.code_It("plt.legend(handles=surface_legend_entries, loc='upper left', title='Smoothings', bbox_to_anchor=(0.00, 1.05))")
+        gdata.code_It("fig.show()")
         plt.show()
         
-        #write out the legend code
+        # #write out the legend code
         
-        #write out the plot label and limits code
-        gdata.code_It(f"ax.set_xlabel('{xlab}')")
-        gdata.code_It(f"ax.set_ylabel('{ylab}')")
-        gdata.code_It(f"ax.set_zlabel('{zlab}')")
-        gdata.code_It(f"ax.set_title('{ctitle}')")
-        gdata.code_It(f"ax.set_xlim({xlower},{xupper})")
-        gdata.code_It(f"ax.set_ylim({ylower},{yupper})")
-        gdata.code_It(f"ax.set_zlim({zlower},{zupper})")
-        #code to show the plot
-        gdata.code_It("#fig.show()")
-        gdata.code_It("plt.show()")
+        # #write out the plot label and limits code
+        # gdata.code_It(f"ax.set_xlabel('{xlab}')")
+        # gdata.code_It(f"ax.set_ylabel('{ylab}')")
+        # gdata.code_It(f"ax.set_zlabel('{zlab}')")
+        # gdata.code_It(f"ax.set_title('{ctitle}')")
+        # gdata.code_It(f"ax.set_xlim({xlower},{xupper})")
+        # gdata.code_It(f"ax.set_ylim({ylower},{yupper})")
+        # gdata.code_It(f"ax.set_zlim({zlower},{zupper})")
+        # #code to show the plot
+        # gdata.code_It("#fig.show()")
+        # gdata.code_It("plt.show()")
         return
 
     def plot3DSurf():
@@ -1748,6 +1858,9 @@ color_variable = False"""
 
         
         #code to read data in (in log file) and check # rows in original and plotted data
+        gdata.code_It("################################")
+        gdata.code_It("## Code for ECDF Plot")
+
         lstr0 = f"df = pd.read_csv('{gdata.fpath}',engine='python')"
         lstr1 = "nobs0 = len(df)"
         lstr2 = f"df.dropna(subset={active_vars}, inplace = True)"
@@ -1839,7 +1952,9 @@ color_variable = False"""
         nobs = len(df)
         self.master.master.current_data = df #it's ok we don't need to copy the data 
 
-        
+        gdata.code_It("################################")
+        gdata.code_It("## Code for Box Plot")
+
         #code to read data in (in log file) and check # rows in original and plotted data
         lstr0 = f"df = pd.read_csv('{gdata.fpath}',engine='python')"        
         lstr1 = "nobs0 = len(df)"
@@ -1962,6 +2077,9 @@ color_variable = False"""
         df.dropna(subset=active_vars, inplace = True)
         nobs = len(df)
         self.master.master.current_data = df #it's ok we don't need to copy the data 
+
+        gdata.code_It("################################")
+        gdata.code_It("## Code for Histogram Plot")
 
         
         #code to read data in (in log file) and check # rows in original and plotted data
