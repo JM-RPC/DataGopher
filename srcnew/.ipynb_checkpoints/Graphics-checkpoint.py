@@ -12,10 +12,17 @@ from sklearn.metrics import roc_curve, auc
 import statsmodels.api  as sm
 import statsmodels.formula.api as smf
 from statsmodels.graphics.regressionplots import plot_partregress_grid, plot_leverage_resid2, influence_plot, plot_fit
+from statsmodels.genmod.generalized_linear_model import SET_USE_BIC_LLF
+SET_USE_BIC_LLF(True) 
+
 from scipy import stats
+
 import numpy as np
+
 import pandas as pd
+
 import io
+
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -319,20 +326,18 @@ def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False
 def do_Report(res = None, model_string='', alpha = 0.05, model_type = "OLS"):
     SSstr0 = "\n==============================================================================\n"
     Sumstr = ''
-    ICstr = ''
+    IC_str = ''
     SSstr = ''
     if model_type == 'OLS':
-        ICstr = f"AIC = {res.aic}, BIC(dev) = {res.bic}  \n"
-        Sumstr = f"Model: {model_string} \n\n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1])  
-        Sumstr = Sumstr + SSstr0  +str(res.summary().tables[2])+ "\n" + ICstr
+        Sumstr = f"Model: {model_string} \n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1])  
+        Sumstr = Sumstr + SSstr0  +str(res.summary().tables[2])+ "\n" 
         if res.model.k_constant == 0:
             SSwarn = "Warning: No constant in model. Uncentered R2, SST, MST, etc. reported. "
+            SSwarn = SSwarn + "\n This changes the interpretation statistical measures of model fit."
         else:
             SSwarn = ""
 
         SSstr = SSstr0 + SSwarn + SSstr0 + Sumstr + "\n"
-        #anova_rep_s = str(sm.stats.anova_lm(res,typ=2))
-        #SSstr = SSstr + SSstr0 + "ANOVA-2" + "\n" + anova_rep_s + SSstr0
         anova_rep = sm.stats.anova_lm(res, typ=1)
         anova_rep_s = str(anova_rep)   
         SSstr = SSstr + SSstr0 + "ANOVA" + "\n" + anova_rep_s + SSstr0
@@ -352,11 +357,15 @@ def do_Report(res = None, model_string='', alpha = 0.05, model_type = "OLS"):
         anova_rep.loc['Regression'] = row1
         anova_rep.loc['Total'] = row2
         anova_rep.replace(np.nan," ")
-        SSstr = SSstr + str(anova_rep[anova_rep.columns[0:len(anova_rep.columns)-2]][-3:]) + '\n' + SSstr0
+        sereg = f"Standard Error of Regression: {np.sqrt(res.scale)}"
+        #IC_str = f"AIC = {res.aic}, BIC(dev) = {res.bic}\n"
+        SSstr = SSstr + str(anova_rep[anova_rep.columns[0:len(anova_rep.columns)-2]][-3:]) + '\n' + SSstr0 + sereg + "\n" + IC_str + "\n"
     else:
-        IC_str = f"AIC = {res.aic}, BIC(dev) = {res.bic} BIC(ll): {res.bic_llf} \n"
+        #Add next line to report both forms of BIC.
+        #IC_str = f"AIC = {res.aic}, BIC(dev) = {res.bic} BIC(ll): {res.bic_llf} \n"
+        IC_str = f"AIC = {res.aic}, BIC = {res.bic} \n"
         if res.model.k_constant == 0:
-            SSwarn = "Warning: No constant in model. This changes the interpretation and may inflate reported fit. "
+            SSwarn = "Warning: No constant in model. This changes the \ninterpretation of statistical measures of model fit. "
         else:
             SSwarn = ""
         Sumstr = f"Model: {model_string} \n\n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1]) +"\n"  + SSstr0 +"\n"+ IC_str

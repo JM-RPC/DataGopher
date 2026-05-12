@@ -3,14 +3,14 @@
 """
 Created on Tue Apr  2 15:45:31
 
-@author: JM-RPC
+@author: Knucklehead
 """
 from tkinter import messagebox
 
 import statsmodels.api  as sm
 import statsmodels.formula.api as smf
 from statsmodels.genmod.generalized_linear_model import SET_USE_BIC_LLF
-SET_USE_BIC_LLF(False) 
+SET_USE_BIC_LLF(True) 
 import numpy as np
 import pandas as pd
     
@@ -122,7 +122,7 @@ def goModel():
     #choose and estimate a model
     STOP = False
     if (MODEL_TYPE == 'LOGIT'):                          ######LOGIT
-        if set([0,1]) == set(outcomes) :
+        if ((df[DEPVAR].max() <= 1) and (df[DEPVAR].min() >= 0)):
             try:
                 res = smf.glm(formula = MODEL_STRING, data = df, family=sm.families.Binomial(link=sm.families.links.Logit())).fit()
                 gdata.code_It(f"res = smf.glm(formula = '{MODEL_STRING}', data = df, family=sm.families.Binomial(link=sm.families.links.Logit())).fit()")
@@ -130,11 +130,11 @@ def goModel():
                 gdata.log_It(f"GLM Logit Fit Failed. Error: {er}")
                 STOP = True
         else:
-            gdata.log_It("...Logistic Regression Error: dependent variable not binary 0,1.")
+            gdata.log_It("...Logistic Regression Error: dependent variable not binary 0,1 or a 0<=proportion<=1.")
             #print(LOGSTR)
             STOP=True
     elif (MODEL_TYPE == 'PROBIT'):                        ######PROBIT
-        if set([0,1]) == set(outcomes) :
+        if ((df[DEPVAR].max() <= 1) and (df[DEPVAR].min() >= 0)):
             try:
                 #res = smf.logit(formula = input.stringM(), data=df).fit()
                 res = smf.glm(formula = MODEL_STRING, data = df, family=sm.families.Binomial(link=sm.families.links.Probit())).fit()
@@ -143,7 +143,7 @@ def goModel():
                 gdata.log_It(f"GLM Probit Fit Failed. Error: {er}")
                 STOP = True
         else:
-            gdata.log_It("...Probit ModelError: dependent variable not binary 0,1.")
+            gdata.log_It("...Probit ModelError: dependent variable not binary 0,1 or a 0<=proportion<=1.")
             #print(LOGSTR)
             STOP=True
     elif (MODEL_TYPE == 'GAMMA'):                          ######GAMMA
