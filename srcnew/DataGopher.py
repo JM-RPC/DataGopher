@@ -174,6 +174,7 @@ class goStat(tk.Tk):
                     headercols = len(inputheader)
                     colnamelist = list(inputheader)
                     #headerNAs = sum(df_temp.iloc[0].isna())
+                    ###Check for NA's in the header 
                     headerNAs = sum(inputheader.isna())
                     if headerNAs > 0:
                         naCol = [idx for idx, item in enumerate(inputheader.isna()) if item]
@@ -193,6 +194,7 @@ class goStat(tk.Tk):
                     #inputheader =  df_temp.iloc[0].astype(str)
                     headercols = len(inputheader)
                     df = pd.read_csv(filepath, skiprows = 1, header=None) # header=0 is default
+                    ###Make sure there are as many column names as columns
                     if len(df.columns) != headercols:
                          # Header line has a different length from the first data line
                          print(inputheader)
@@ -238,6 +240,7 @@ class goStat(tk.Tk):
             if df.empty:
                 messagebox.showwarning("Warning","The selected file is empty or could not be read.")
                 return
+            ### Check for machine infinite values (+/- np.inf)
             suminf = sum([sum(df[item].isin([-np.inf,+np.inf])) for item in df.columns])
             listinf = [item for item in df.columns if sum(df[item].isin([-np.inf, +np.inf])) >0]
             if suminf > 0:
@@ -281,8 +284,8 @@ class goStat(tk.Tk):
                 
             badnames = [checkName(item) for item in df.columns if checkName(item) is not None]
             if len(badnames) > 0: 
-                badnames_str = " ], [ ".join(badnames)
-                mstr  = "Found nonconforming variable names:\n" + "[" + badnames_str + "]\n"
+                badnames_str = " ], [ ".join(badnames[:5])
+                mstr  = "Found nonconforming variable names:\n" + badnames_str + "..." + "\n"
                 mstr += "Variable names may consist of letters, numbers \nand underscores,"
                 mstr += "no initial numerals, other symbols or included spaces.  "
                 mstr += "Variables with non-conforming names may \nbe excluded from modelling and plotting.\n"

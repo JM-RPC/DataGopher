@@ -73,7 +73,7 @@ class goData(tk.Toplevel):
         
 
         self.title("Data Wrangler Prototype") 
-        self.geometry('1080x680+0+0')
+        self.geometry('1280x880+0+0')
         self.filepath = ''
         self.outdata = pd.DataFrame()
 ################This is the global copy of the data##############
@@ -89,10 +89,10 @@ class goData(tk.Toplevel):
         self.data = pd.DataFrame() #the current data
 
         self.filelabel = tk.Label(self,text = self.filepath)
-        self.filelabel.grid(row = 0, column = 0, rowspan = 6,  sticky ='n', padx = 10)
+        self.filelabel.grid(row = 0, column = 0, rowspan = 3, columnspan = 6,  sticky ='n', padx = 10)
 
         self.save_button = tk.Button(self,text="Save Data", command = self.saveData)
-        self.save_button.grid(row = 0, column = 3, sticky = 'w')
+        self.save_button.grid(row = 0, column = 6, sticky = 'w')
         
         #self.filter_button = tk.Button(self, text="Revert Data", command = self.revertData)
         #self.filter_button.grid(row = 0, column = 4)
@@ -105,7 +105,7 @@ class goData(tk.Toplevel):
         self.bdryrow = tk.Label(self,text = bdry).grid(row = 11, column = 0, columnspan = 5)
 
         self.pframe = ttk.Frame(self)
-        self.pframe.grid(row=12, column = 0, columnspan = 5)
+        self.pframe.grid(row=11, column = 0, columnspan = 5)
         self.dfrm = ptc.DataFrameTreeView(self.pframe)
         self.dfrm.pack(side = tk.TOP, pady=20, padx=20, fill = tk.BOTH, expand = True)
         
@@ -117,6 +117,7 @@ class goData(tk.Toplevel):
         self.transformer_ind = False
         self.renameit_ind = False
         self.filterer_ind = False
+        self.columnDropper_ind = False
         self.reFormer_ind = False
         
         self.syncData()
@@ -200,38 +201,48 @@ class goData(tk.Toplevel):
             self.transformer_ind = False
         self.transformer = dataTransform(self)
         self.transformer_ind = True
-        self.transformer.grid(row = 2, column = 0, columnspan = 5, sticky = 'w')
+        self.transformer.grid(row = 2, column = 0, columnspan = 10, sticky = 'w')
         
         if self.renameit_ind:
             self.renameit.destroy()
             self.renameit_ind = False
         self.renameit = dataRename(self)
-        self.renameit.grid(row = 4, column = 0, columnspan = 5,sticky = 'w')
+        self.renameit.grid(row = 4, column = 0, columnspan = 10,sticky = 'w')
         self.renameit_ind = True
             
         if self.filterer_ind:
             self.filterer.destroy()
             self.filterer_ind = False
         self.filterer = dataFilter(self)
-        self.filterer.grid(row = 6, column = 0, columnspan = 5, sticky = 'w')
+        self.filterer.grid(row = 6, column = 0, columnspan = 3, sticky = 'w')
         self.filterer_ind = True
-        
+
         if self.reFormer_ind:
             self.reFormer.destroy()
             self.reFormer_ind = False
         self.reFormer = reFormData(self)
-        self.reFormer.grid(row = 8, column = 0, columnspan = 5, sticky = 'w')
+        self.reFormer.grid(row = 8, column = 0, columnspan = 3, sticky = 'w')
         self.reFormer_ind = True
+        
+        if self.columnDropper_ind:
+            self.columnDropper.destroy()
+            self.dropcolumn_ind = False
+        self.columnDropper = dropColumns(self)
+        self.columnDropper.grid(row = 8, column = 3, columnspan = 3, sticky = 'w')
+        self.columnDropper_ind = True
 
         self.dfrm.do_display(self.data)
             
         self.filelabel.config(text = gdata.fpath + f"   #Rows = {len(gdata.data)} #Columns = {len(gdata.data.columns)}")
-        
+
+        #print(f"\nat sync data: {list(self.data.columns)}")
+
         self.transformer.options['values'] = list(self.data.columns)
         self.filterer.options['values'] = list(self.data.columns)
         self.renameit.options['values'] = list(self.data.columns)
         self.reFormer.row_widget.resetList(NUCHOICES=list(self.data.columns))
-        self.reFormer.col_widget.resetList(NUCHOICES=list(self.data.columns))
+        self.columnDropper.drop_widget.resetList(NUCHOICES = list(self.data.columns))
+        #self.reFormer.col_widget.resetList(NUCHOICES=list(self.data.columns))
         self.master.varlist0 = list(self.data.columns)
 
         return
@@ -239,12 +250,60 @@ class goData(tk.Toplevel):
     def goRename(self):
         self.renameit = dataRename(self)
         self.renameit.grid(row = 5, column = 0, columnspan = 5)
- 
+        
+class dropColumns(tk.Frame):
+    def __init__(self,parent):
+        super().__init__(master=parent)
+        self.configure(borderwidth=2, relief="ridge", highlightthickness=2)
+        self.data = self.master.data.copy(deep = True)
+        if len(self.data) > 0:
+            colnames = list(gdata.data.columns)
+            numcolnames = [item for item in colnames if is_numeric_dtype(gdata.data[item])]
+        else:
+            colnames = []
+            numcolnames = []
+            return
+
+        self.droplist = []
+        self.dw = ttk.Frame(self)
+        
+        self.droplabel = tk.Label(self.dw,text = "Drop Columns", fg = 'white', bg = 'blue')
+        self.droplabel.grid(row  = 0, column = 0, sticky = 'w')
+        self.dropButton = tk.Button(self.dw, text = "Drop Columns", command = self.doDrop).grid(row=0, column=1, sticky= 'w',pady = 10, padx = 10)
+        self.drop_widget = lw.goList(self.dw,TEXT = "Cols to drop:", CHOICES = colnames)
+        self.drop_widget.grid(row = 1, column = 0, columnspan = 3,sticky = 'w')
+        self.dw.pack(side =tk.TOP)   
+
+    def doDrop(self,*args):
+        idv = self.drop_widget.rowlist
+        if len(idv) == 0:
+            return
+        self.data = self.master.data.copy(deep = True)
+        dfnew = self.data.drop(columns = idv)
+        ########################################################## 
+        ###  Display the results           
+        #self.master.dfrm.do_display(self.master.data)  
+        self.master.dfrm.do_display(self.data)
+        #self.master.filelabel.config(text = gdata.fpath + f"   #Rows = {len(gdata.data)} #Columns = {len(gdata.data.columns)}")
+        self.master.filelabel.config(text = gdata.fpath + f"   #Rows = {len(dfnew)} #Columns = {len(dfnew.columns)}")
+        
+        ###########################################################
+        ###########################################################
+        ##### Update global data structures
+        gdata.log_It(f"...Success!  number of rows: {len(dfnew)} number of columns: {len(dfnew.columns)}")
+        self.data = dfnew.copy(deep = True) #update the copy local to dropColumns class
+        self.master.data = dfnew.copy(deep = True) #move transformed data back to parent class
+        gdata.put_Data(self.master.data) #update global copy of the data
+        self.master.syncData()
+
+        return
+        
 class reFormData(tk.Frame):
     def __init__(self,parent):
         super().__init__(master = parent)
         self.configure(borderwidth=2, relief="ridge", highlightthickness=2)
         #self.title('ReForm Data')
+        self.droplist = []
 
         if len(gdata.data) > 0:
             colnames = list(gdata.data.columns)
@@ -273,7 +332,7 @@ class reFormData(tk.Frame):
         self.row_widget = lw.goList(self.fw,TEXT = "ID Variables:", CHOICES = colnames)
         self.row_widget.grid(row = 1, column = 0, columnspan = 3,sticky = 'w')
         self.col_widget = lw.goList(self.fw,TEXT = "Value Variables:", CHOICES = colnames)
-        self.col_widget.grid(row = 1, column = 4,columnspan = 3,sticky= 'w')
+        self.col_widget.grid(row = 2, column = 0,columnspan = 3,sticky= 'w')
 
         self.fw.pack(side =tk.TOP)   
         #self.f1.pack()
@@ -288,21 +347,33 @@ class reFormData(tk.Frame):
         ########################################
         dfnew = pd.DataFrame()
         idv = self.row_widget.rowlist
+        print("idv:")
+        print(idv)
+        #valv = [item for item in dfnew.columns if item not in idv] #self.col_widget.rowlist
         valv = self.col_widget.rowlist
+        print("valv:")
+        print(valv)
         if bool(set(idv) & set(valv)):
             messagebox.showerror("  ", "Error: ID and Value Choices must be disjoint.")
             return
         gdata.log_It(f"Attempting data reshape: ")
         gdata.log_It(f"dfnew = pandas.melt(data, id_vars = {idv}, value_vars = {valv})")
         try:
-            dfnew = pd.melt(self.data, id_vars = idv, value_vars = valv)
+            #dfnew = pd.melt(self.data, id_vars = idv, value_vars = valv)
+            if len(valv) >0:
+                dfnew = pd.melt(self.data, id_vars = idv, value_vars = valv, var_name = '_variable', value_name = '_value')
+                gdata.code_It(f"dfnew = pd.melt(df, id_vars = {idv}, value_vars = {valv}, var_name = '_variable', value_name = '_value')")
+            else:
+                dfnew = pd.melt(self.data, id_vars = idv, var_name = '-variable', value_name = '_value')
+                gdata.code_It(f"dfnew = pd.melt(df, id_vars = {idv}, var_name = '_variable', value_name = '_value')")
+
         except Exception as er:
             emsg = f"Variable transformation failed error{er}\n "
             emsg += "Make sure that the ID variables don't have too many outcomes."
             emsg += "Make sure that the Value variables are numeric"
             messagebox.showerror("  ",emsg)
             return
-            
+           
         ########################################################## 
         ###  Display the results           
         #self.master.dfrm.do_display(self.master.data)  
@@ -374,7 +445,7 @@ class dataRename(tk.Frame):
         self.master.broadcastData(self)
         gdata.log_It(f"Changed variable name from: {self.selected_variable.get()} to:{self.vname.get()}")
 
-        #change the list options in the filter, transform, rename, and reform widgets   
+        #change the list options in the filter, transform, rename, reform, and drop widgets   
         self.master.transformer.options['values'] = list(self.master.data.columns)
         self.master.filterer.options['values'] = list(self.master.data.columns)
         self.options['values'] = list(self.master.data.columns)
@@ -382,6 +453,7 @@ class dataRename(tk.Frame):
         self.master.dfrm.do_display(self.master.data)    
         self.master.reFormer.row_widget.resetList(NUCHOICES=list(self.master.data.columns))
         self.master.reFormer.col_widget.resetList(NUCHOICES=list(self.master.data.columns))
+        self.master.columnDropper.drop_widget.resetList(NUCHOICES=list(self.master.data.columns))
 
         
 
@@ -435,6 +507,7 @@ class dataTransform(tk.Frame):
             self.master.renameit.options['values'] = list(self.master.data.columns)
             self.master.reFormer.row_widget.resetList(NUCHOICES=list(self.master.data.columns))
             self.master.reFormer.col_widget.resetList(NUCHOICES=list(self.master.data.columns))
+            self.master.columnDropper.drop_widget.resetList(NUCHOICES=list(self.master.data.columns))
             self.options['values'] = list(self.master.data.columns)
             self.master.varlist0 = list(self.master.data.columns)
             self.master.broadcastData(self)
@@ -448,6 +521,7 @@ class dataTransform(tk.Frame):
             self.master.renameit.options['values'] = list(self.master.data.columns)
             self.master.reFormer.row_widget.resetList(NUCHOICES=list(self.master.data.columns))
             self.master.reFormer.col_widget.resetList(NUCHOICES=list(self.master.data.columns))
+            self.master.columnDropper.drop_widget.resetList(NUCHOICES=list(self.master.data.columns))
             self.options['values'] = list(self.master.data.columns)
             self.master.varlist0 = list(self.master.data.columns)
             self.master.broadcastData(self)
@@ -715,7 +789,7 @@ class fVar_cat(tk.Frame):
         self.catselect_out.grid(row = 1, column = 2, padx = 10)
         
         self.meqn = tk.StringVar(None)
-        self.teq1label = tk.Label(self.catf,text="Row values selected:").grid(row = 2, column=0, sticky = 'e', padx = 5)
+        self.teq1label = tk.Label(self.catf,text="Permissable Row Values:").grid(row = 2, column=0, sticky = 'e', padx = 5)
         self.teq1 = tk.Entry(self.catf,textvariable = self.meqn, width = 90)
         self.teq1.grid(row = 2, column = 1, columnspan=6, sticky = 'w',padx=10)        
         self.catf.pack()

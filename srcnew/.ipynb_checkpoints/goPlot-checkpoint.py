@@ -787,12 +787,28 @@ class gPlot(tk.Frame):
     def get2DScatterGridParms(self):
 
         self.regline = tk.StringVar(self, value='No')
+        self.gridplottype = tk.StringVar(self, value='Dots')
+        self.gridplottype_label = tk.Label(
+            self.optionsframe, text= "Plot data with: ").grid(row=0, column = 0)
+        self.regbutton = tk.Radiobutton(
+            self.optionsframe, text="Dots", variable=self.gridplottype, value="Dots").grid(row=0, column=1)
+        self.regbutton = tk.Radiobutton(
+            self.optionsframe, text="Lines", variable=self.gridplottype, value="Lines", command = self.setgriddotline).grid(row=0, column=2)
         self.reglabel = tk.Label(
             self.optionsframe, text="Show regression line?").grid(row=1, column=0)
         self.regbutton = tk.Radiobutton(
             self.optionsframe, text="Yes", variable=self.regline, value="Yes").grid(row=1, column=1)
         self.regbutton = tk.Radiobutton(
             self.optionsframe, text="No", variable=self.regline, value="No").grid(row=1, column=2)
+        ###############
+        self.ggxszsld = tk.Label(self.optionsframe, text='Marker Size:')
+        self.ggxszsld.grid(row=2, column=0, sticky='w')
+        self.ggxlsz = tk.Scale(self.optionsframe, from_=0.25,
+                              to=100, orient='horizontal', showvalue=True)
+        self.ggxlsz.grid(row=2, column=1, columnspan=2, sticky='w')
+        self.ggxlsz.set(5)
+
+        ###############
 
         # self.label = tk.Label(self.optionsframe, text="Plot type: 2D Line Plot Grid").grid(row = 0, column = 0)
         self.gobutton = tk.Button(self.optionsframe, text="Plot It!",
@@ -802,7 +818,10 @@ class gPlot(tk.Frame):
             row=0, column=7, sticky='w')
         self.gxlabel = tk.Entry(self, textvariable=self.titlelabel, width=20)
         self.gxlabel.grid(row=0, column=8, sticky='w')
-
+        
+    def setgriddotline(self):
+        self.regline.set(value = "No")
+        
     def get3DScatterParms(self):
         # self.label = tk.Label(self.optionsframe, text="Plot type: 3D Scatter Plot").grid(row = 0, column = 0)
         self.gobutton = tk.Button(self.optionsframe, text="Plot It!",
@@ -1151,7 +1170,8 @@ class gPlot(tk.Frame):
 
             if (showline):
                 # print("lineplot params showline only ***>:\n =======\n",lineplotdict)
-                lstr = "sb.lineplot(df, ax = ax, **{lineplotdict})"
+                #gdata.code_It(f"lineplotdict = {lineplotdict}")
+                lstr = f"sb.lineplot(df, ax = ax, **{lineplotdict})"
                 gdata.code_It(lstr)
                 sb.lineplot(df,ax = ax,  **lineplotdict)
 
@@ -1231,7 +1251,11 @@ class gPlot(tk.Frame):
         # if cf == '-' and rf == '-': return
         # find the object for the "y" variable
         ytemp = vy.clickedGXmkr.get()
+        dolines = False
+        if self.gridplottype.get() == "Lines": dolines = True
+            
         doreg = self.regline.get()
+        
 
         # get the marker choice
         if ytemp == '-':
@@ -1242,7 +1266,7 @@ class gPlot(tk.Frame):
         ycolor = vy.clickedGXcol.get()
         if ycolor == '-':
             ycolor = 'black'
-        ysize = vy.gxlsz.get()
+        ysize = self.ggxlsz.get()
 
         # get the plot type
         plot_type = self.plotchoice.get()
@@ -1314,13 +1338,21 @@ class gPlot(tk.Frame):
             if doreg == 'Yes':
                 plotdict["scatter_kws"] = {"s": ysize}
             else:
-                plotdict["s"] = ysize
+                if dolines:
+                    plotdict['kind'] = 'line'
+                    plotdict['lw'] = ysize
+                else:
+                    plotdict["s"] = ysize
         else:
             if doreg == 'Yes':
                 plotdict["scatter_kws"] = {"s": ysize, "color":ycolor}
             else:
-                plotdict['color'] = ycolor
-                plotdict['s'] = ysize
+                if dolines:
+                    plotdict['color'] = ycolor
+                    plotdict['lw'] = ysize
+                else:
+                    plotdict['color'] = ycolor
+                    plotdict['s'] = ysize
         if (rf != '-'):
             plotdict['row'] = rf
         if (cf != '-'): 
