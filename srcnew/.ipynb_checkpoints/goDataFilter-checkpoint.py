@@ -280,6 +280,7 @@ class dropColumns(tk.Frame):
             return
         self.data = self.master.data.copy(deep = True)
         dfnew = self.data.drop(columns = idv)
+        gdata.code_It(f"df = df.drop(columns = {idv})")
         ########################################################## 
         ###  Display the results           
         #self.master.dfrm.do_display(self.master.data)  
@@ -638,7 +639,11 @@ class dataFilter(tk.Frame):
             filterlist = self.flt.invalues
             filtervar = self.selected_variable.get() 
             #TODO: find a better way to keep the index in sync with choice list
+            #use a lambda function to convert the column corresponding to filtervar to strings
+            #Then test each entry in resulting series of strings to see if it is in the filterlist
+            #rowchoice records the logical outcome for each entry in data[filtervar]
             rowchoice = pd.Series(map(lambda x:str(x),self.data[filtervar])).isin(filterlist)
+            #give rowchoice the same index as the dataframe
             rowchoice.index = self.data.index
             gdata.code_It(f"rowchoice = pd.Series(map(lambda x:str(x), df['{filtervar}'])).isin({filterlist})")
             self.nudata = self.data.loc[rowchoice]

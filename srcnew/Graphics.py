@@ -7,40 +7,29 @@ Created on Tue Apr  2 15:45:31
 """    
 
 #import pdb; pdb.set_trace()
-import tkinter as tk
 from sklearn.metrics import roc_curve, auc
 import statsmodels.api  as sm
-import statsmodels.formula.api as smf
-from statsmodels.graphics.regressionplots import plot_partregress_grid, plot_leverage_resid2, influence_plot, plot_fit
+from statsmodels.graphics.regressionplots import plot_fit
 from statsmodels.genmod.generalized_linear_model import SET_USE_BIC_LLF
-SET_USE_BIC_LLF(True) 
-
-from scipy import stats
+import sys
 
 import numpy as np
-
 import pandas as pd
-
-import io
-
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sb
-from mpl_toolkits.mplot3d import Axes3D
 
 
-import os
-import signal
-from datetime import datetime    
+SET_USE_BIC_LLF(True)
 
 #from Regression import imdl
 
 LOGSTR = ''
 
-def pushlog(msgstr):
-    global LOGSTR
-    LOGSTR = LOGSTR + '\n' + msgstr
+# def pushlog(msgstr):
+#     global LOGSTR
+#     LOGSTR = LOGSTR + '\n' + msgstr
     
     
 basecolors0 = ['blue', 'red',  'green', 'yellow', 'magenta', 'cyan', 'violet',
@@ -84,7 +73,8 @@ def doTrend(res, depvar, indvars, MTYPE = '-'):
     #calculates the data for plotting the fitted regression line 
     # or plane and confidence intervals for a model. 
     # Returns xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1
-    fitdata = res.model.data.frame[[depvar] + indvars]
+
+    fitdata = res.model.data.frame[[depvar] + list(indvars)]
     dfg = fitdata
     cur_mdl = res
     yv = depvar
@@ -119,18 +109,20 @@ def doTrend(res, depvar, indvars, MTYPE = '-'):
         xvar = np.arange(xlo, xup, deltax/gridcount) 
         yvar = []                      
         exog0 = pd.DataFrame({xv : xvar})
-    #print(f"exog0 = {exog0.head()}")
-
-    #print(f"Current model: {cur_mdl.summary()}")
-    #MTYPE = imdl.model_type
       
     try:
        res_predictions =cur_mdl.get_prediction(exog=exog0,transform = True)
        res_frame = res_predictions.summary_frame(alpha = 0.05)
     except Exception as er:
-        #print(f"...Predictions failed! {er}")
+        print(f"...Predictions failed! {er}")
         return [],[],[],[],[],[],[]
-   
+    #kludge: statsmodels.discrete.NegativeBinomial calls the predicted columns by different names.
+    #if I see column 0 of resframe named 'predicted' I know it comes from
+    #statsmodels.discrete.discrete_model.NegativeBinomial
+    #change to conform to glm (I shouldn't have to do this!)
+    if res_frame.columns[0] == 'predicted': #this is 'mean' in glm results
+        res_frame.rename(columns={'predicted':'mean', 'se': 'mean_se', 
+                                'ci_lower': 'mean_ci_lower', 'ci_upper':'mean_ci_upper'}, inplace=True)
     znew = res_frame['mean'].values.reshape(xvar.shape)    
     Ci_lb1 =  res_frame['mean_ci_lower'].values.reshape(xvar.shape)
     Ci_ub1 =  res_frame['mean_ci_upper'].values.reshape(xvar.shape)
@@ -147,7 +139,8 @@ def doTrend(res, depvar, indvars, MTYPE = '-'):
 #Model Graphics Functions    
 ##########################  
 def doroc(MODEL = None):
-    if (MODEL is None): return
+    if (MODEL is None):
+        return
     prediction_res = MODEL.get_prediction(transform = True)
     res_frame= prediction_res.summary_frame(alpha = 0.05)
 
@@ -168,21 +161,29 @@ def doroc(MODEL = None):
 
 
 def dopredict(res = None, xname = None, colorvar = '-', dsize = 8.0 ):
-    if res is None: return
-    if xname == '-' or xname == '': return  
+    if res is None:
+        return
+    if xname == '-' or xname == '':
+        return  
     tstr = res.model.formula
-    depvar = res.model.endog
+    depvar = res.model.endog_names
     dsize = 8.0
     prediction_res = res.get_prediction(transform = True)
     res_frame= prediction_res.summary_frame(alpha = 0.05)
-    ylabstr = "Est. Mean Response"
+    #kludge: statsmodels.discrete.NegativeBinomial calls the predicted columns by different names.
+    #if I see column 0 of resframe named 'predicted' I know it comes from
+    #statsmodels.discrete.discrete_model.NegativeBinomial
+    #change to conform to glm (I shouldn't have to do this!)
+    if res_frame.columns[0] == 'predicted': #this is 'mean' in glm results
+        res_frame.rename(columns={'predicted':'mean', 'se': 'mean_se', 'ci_lower': 'mean_ci_lower', 'ci_upper':'mean_ci_upper'}, inplace=True)
+    ylabstr = f"Est. Mean Response: {depvar}"
     fig, ax = plt.subplots() 
     if colorvar == '-' or colorvar == '':
         sb.scatterplot(ax = ax, x = res.model.data.frame[xname], y = res_frame['mean'], color = 'blue',label = 'Observed', s= dsize)
     else:
         sb.scatterplot(ax = ax, x = res.model.data.frame[xname], y = res_frame['mean'], hue = res.model.data.frame[colorvar], palette = 'bright', s= dsize)
     #plt.ylim((0, 1))
-    plt.ylabel(ylabstr)
+    plt.ylabel(ylabstr + f" {depvar}")
     plt.xlabel(xname)
     plt.title(tstr)
     fig.show()  #show the plots simultaneously
@@ -190,9 +191,11 @@ def dopredict(res = None, xname = None, colorvar = '-', dsize = 8.0 ):
     return
 
 def showFit(res = None, xname = None, colorvar = '-', dsize = 8.0 ):
-    if xname is None: return
+    if xname is None:
+        return
     xvdependent = xname
-    if (xvdependent == '') or (xvdependent == '-'): return       
+    if (xvdependent == '') or (xvdependent == '-'):
+        return       
     dsizenu = float(dsize)/20.0
     fig, ax = plt.subplots()
     plot_fit(res, xvdependent, vlines = False, ax = ax, markersize=dsizenu)
@@ -206,15 +209,20 @@ def showFit(res = None, xname = None, colorvar = '-', dsize = 8.0 ):
 
 
 def doresidual(res = None, mtype = 'OLS', xname = None, cvresid = None, dsize = 8.0):
-    if res == None: return
+    if res is None:
+        return
     tstr = res.model.formula
     #xvresidlist = list(res.model.exog_names)
     #xname is the x variable for the residual plot.  
     # If it's not given, then the residuals will be 
     # plotted against the predicted values.
     if mtype != 'OLS': #if it's not OLS it's GLM
-        vres = res.resid_deviance
-        ylabstr = 'Deviance Residual'
+        if hasattr(res, "resid_deviance"):
+            vres = res.resid_deviance
+            ylabstr = 'Deviance Residual'
+        else:
+            vres = res.resid_response
+            ylabstr = 'Reponse Residual'
     else:
         vres = res.resid
         ylabstr = 'Residual'
@@ -223,14 +231,17 @@ def doresidual(res = None, mtype = 'OLS', xname = None, cvresid = None, dsize = 
     if xname is None:
         prediction_res = res.get_prediction(transform = True)
         res_frame= prediction_res.summary_frame(alpha = 0.05)
-        if cvresid == None or cvresid == '-':           
+        if res_frame.columns[0] == 'predicted': #this is 'mean' in glm results
+            res_frame.rename(columns={'predicted':'mean', 'se': 'mean_se', 'ci_lower': 'mean_ci_lower', 
+                                    'ci_upper':'mean_ci_upper'}, inplace=True)
+        if cvresid is None or cvresid == '-':           
             sb.scatterplot(ax=ax, x = res_frame['mean'], y = vres, color = 'blue', s = dsize)
         else:
             sb.scatterplot(ax=ax, x = res_frame['mean'], y = vres, hue = res.model.data.frame[cvresid], palette = 'bright', s = dsize)
         plt.xlabel('Predicted ' + res.model.endog_names)
     else:
         fig, ax = plt.subplots()
-        if cvresid == None or cvresid == '-':
+        if cvresid is None or cvresid == '-':
             sb.scatterplot(ax=ax, x = res.model.data.frame[xname], y = vres, color = 'blue', s = dsize)
         else:
             sb.scatterplot(ax=ax, x = res.model.data.frame[xname], y = vres, hue = res.model.data.frame[cvresid], palette = 'bright', s = dsize)
@@ -248,9 +259,11 @@ def doresidual(res = None, mtype = 'OLS', xname = None, cvresid = None, dsize = 
 #############################
 
 
-def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False', showPI = 'False', MTYPE = '-'):
-    if depvar is None: return
-    if indvars is None: return  
+def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False', showPI = 'False', MTYPE = '-', dsize = 5):
+    if depvar is None:
+        return
+    if indvars is None:
+        return  
     fitdata = res.model.data.frame
     if len(indvars) == 1:
         xv = list(indvars)[0]
@@ -263,7 +276,6 @@ def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False
     else:   
         return
     xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1 = doTrend(res, depvar, indvars, MTYPE = MTYPE)
-    dsize = 8.0
     if len(indvars)==1:
         fig = plt.figure(figsize = (8,8)) 
         ax = fig.add_subplot()
@@ -276,13 +288,13 @@ def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False
             sb.scatterplot(fitdata, x = xv, y= zv, ax = ax, s = dsize, hue = cv, palette = 'bright' )
         dftemp = pd.DataFrame({xv:xvar, zv:znew})
 
-        sb.lineplot(dftemp, x = xv, y = zv, ax = ax, color = 'red', linewidth = dsize/2)
-        if showCI == 'True':
-            sb.lineplot(dftemp, x = xv, y = Ci_lb1, ax = ax, color = 'green', linewidth = dsize/2)
-            sb.lineplot(dftemp, x = xv, y = Ci_ub1, ax = ax, color = 'green', linewidth = dsize/2)
-        if showPI == 'True' and MTYPE == 'OLS':
-            sb.lineplot(dftemp, x = xv, y = Pi_lb1, ax = ax, color = 'cyan', linewidth = dsize/2)
-            sb.lineplot(dftemp, x = xv, y = Pi_ub1, ax = ax, color = 'cyan', linewidth = dsize/2)
+        sb.lineplot(dftemp, x = xv, y = zv, ax = ax, color = 'red', linewidth = np.sqrt(dsize))
+        if showCI :
+            sb.lineplot(dftemp, x = xv, y = Ci_lb1, ax = ax, color = 'green', linewidth = np.sqrt(dsize))
+            sb.lineplot(dftemp, x = xv, y = Ci_ub1, ax = ax, color = 'green', linewidth = np.sqrt(dsize))
+        if showPI and MTYPE == 'OLS':
+            sb.lineplot(dftemp, x = xv, y = Pi_lb1, ax = ax, color = 'cyan', linewidth = np.sqrt(dsize))
+            sb.lineplot(dftemp, x = xv, y = Pi_ub1, ax = ax, color = 'cyan', linewidth = np.sqrt(dsize))
         plt.xlabel(xv)
         plt.ylabel(zv)
         plt.title(res.model.formula)
@@ -293,7 +305,7 @@ def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False
         xv = list(indvars)[0]
         yv = list(indvars)[1]
         zv = depvar
-        cv = '-'
+        cv = color_var
         xdat = fitdata[xv]
         ydat = fitdata[yv]
         zdat = fitdata[zv]
@@ -301,11 +313,11 @@ def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False
         ax.set_ylabel(yv)
         ax.set_zlabel(zv)
         if (cv == '-') or (cv == ''):
-            ax.scatter(xdat, ydat, zdat ,marker='o', color = 'black', s = dsize)
+            ax.scatter3D(xdat, ydat, zdat ,marker='o', color = 'black', s = dsize)
         else:
             colordat = fitdata[cv]
             colorD, colorlist ,lpatches= getcolor(cv,list(colordat))
-            ax.scatter(xdat, ydat, zdat ,marker='o', c = colorlist, s = dsize)
+            ax.scatter3D(xdat, ydat, zdat ,marker='o', c = colorlist, s = dsize)
             if colorD != {}:
                 handles , labels = ax.get_legend_handles_labels()
                 handles.extend(lpatches)
@@ -324,23 +336,25 @@ def modelplot(res, depvar = None, indvars=None, color_var = '-', showCI = 'False
     return
 
 def do_Report(res = None, model_string='', alpha = 0.05, model_type = "OLS"):
+    np.set_printoptions(threshold=sys.maxsize)
     SSstr0 = "\n==============================================================================\n"
     Sumstr = ''
     IC_str = ''
     SSstr = ''
     if model_type == 'OLS':
-        Sumstr = f"Model: {model_string} \n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1])  
-        Sumstr = Sumstr + SSstr0  +str(res.summary().tables[2])+ "\n" 
+        Sumstr = f"Model: {model_string} \n" + res.summary2().as_text()
+        #Sumstr = f"Model: {model_string} \n" + res.summary().as_text() 
+        #Sumstr = Sumstr + SSstr0  +str(res.summary().tables[2])+ "\n" 
         if res.model.k_constant == 0:
             SSwarn = "Warning: No constant in model. Uncentered R2, SST, MST, etc. reported. "
             SSwarn = SSwarn + "\n This changes the interpretation statistical measures of model fit."
         else:
             SSwarn = ""
-
         SSstr = SSstr0 + SSwarn + SSstr0 + Sumstr + "\n"
         anova_rep = sm.stats.anova_lm(res, typ=1)
-        anova_rep_s = str(anova_rep)   
-        SSstr = SSstr + SSstr0 + "ANOVA" + "\n" + anova_rep_s + SSstr0
+        anova_rep.replace(np.nan," ")
+        #nova_rep_s = str(anova_rep)   
+        #SSstr = SSstr + SSstr0 + "ANOVA" + "\n" + anova_rep_s + SSstr0
 
         SSstr = SSstr + SSstr0 + '\n' + 'Sums of Squares:' + "\n"
 
@@ -368,6 +382,8 @@ def do_Report(res = None, model_string='', alpha = 0.05, model_type = "OLS"):
             SSwarn = "Warning: No constant in model. This changes the \ninterpretation of statistical measures of model fit. "
         else:
             SSwarn = ""
-        Sumstr = f"Model: {model_string} \n\n" + str( res.summary().tables[0]) + "\n" + str(res.summary2().tables[1]) +"\n"  + SSstr0 +"\n"+ IC_str
+        #Sumstr = f"Model: {model_string} \n\n" +  str(res.summary().tables[0]) + "\n" + str(res.summary2().tables[1]) +"\n"  + SSstr0 +"\n"+ IC_str
+        Sumstr = f"Model: {model_string} \n\n" + res.summary2(float_format="%10.6f").as_text() + "\n" + SSstr0 + "\n" + IC_str
+        #Sumstr = f"Model: {model_string} \n\n" + res.summary().as_text() + "\n" + SSstr0 + "\n" + IC_str
         SSstr = SSstr0 + SSwarn + SSstr0 + Sumstr + SSstr0 + "\n"
     return SSstr

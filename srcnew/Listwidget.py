@@ -7,15 +7,11 @@ Created on Thu Oct 23 11:05:26 2025
 """
 
 
-import numpy as np 
-
 import pandas as pd
-from pandas.api.types import is_numeric_dtype
 import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext, ttk
+from tkinter import filedialog, messagebox, ttk
 
-import globalData as gd
-from   globalData import gdata
+from globalData import gdata
 
 
 
@@ -51,8 +47,10 @@ class goList(tk.Frame):
 
     def varupdate_row_in(self, *args):
         nuvar = self.selected_row_in.get()
-        if nuvar == '' :return
-        if nuvar in self.rowlist: return
+        if nuvar == '' :
+            return
+        if nuvar in self.rowlist:
+            return
         self.rowlist.append(nuvar)
         self.selected_row_in.set('')
         rowchoices = [item for item in self.choices if item not in self.rowlist]
@@ -63,8 +61,10 @@ class goList(tk.Frame):
     
     def varupdate_row_out(self, *args):
         oldvar = self.selected_row_out.get()
-        if oldvar == '': return
-        if oldvar not in self.rowlist: return
+        if oldvar == '':
+            return
+        if oldvar not in self.rowlist:
+            return
         self.rowlist.remove(oldvar)
         self.selected_row_out.set('')
         rowchoices = [item for item in self.choices if item not in self.rowlist]
@@ -172,6 +172,5 @@ if __name__ == "__main__":
     #fileGetWindow = dr.fileBrowsePreview()
     #df = fileGetWindow.data
     #filename = fileGetWindow.filepath
-    import globalData as gd
 
     

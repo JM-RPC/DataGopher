@@ -9,16 +9,12 @@ Created on Tue Oct 21 14:45:30 2025
 from datetime import datetime
 import Listwidget as lw
 
-import numpy as np 
-
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext, ttk
+from tkinter import filedialog, messagebox, ttk
 
-import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 # from matplotlib.backends.backend_tkagg import (
 #     FigureCanvasTkAgg, # interface between Figure class and Tkinter's Canvas
 #     NavigationToolbar2Tk # built-in toolbar for the figure
@@ -26,9 +22,7 @@ import matplotlib.patches as mpatches
 
 
 
-import globalData as gd
 from globalData import gdata
-
 
 import seaborn as sb
 
@@ -146,7 +140,8 @@ class goPivot(tk.Toplevel):
                 initialfile = f"goData_{str(datetime.now()).replace(' ','_')}.csv"
                 )
             #print(f"File path: |{file_path}|")
-            if (file_path != ''): gdata.datatable.to_csv(file_path)
+            if (file_path != ''):
+                gdata.datatable.to_csv(file_path)
         else:
             messagebox.showerror(" ","You need to create a pivot table to save a pivot table.")
         return
@@ -154,7 +149,8 @@ class goPivot(tk.Toplevel):
         
     def dopivotPlot(self, *args):
         plotname = self.selected_plot.get()
-        if plotname == '': plotname = 'line'
+        if plotname == '':
+            plotname = 'line'
         if plotname != 'Pie Chart':
             try:
                 gdata.datatable.plot(kind = plotdict[plotname], figsize = (6,4), rot = 90)
@@ -185,7 +181,7 @@ class goPivot(tk.Toplevel):
         inter_a = bool(set(pcols) & set(prows))
         inter_b = bool(set(pcols) & set(pvals))
         inter_c = bool(set(prows) & set(pvals))
-        if (inter_a | inter_b | inter_c) : 
+        if inter_a or inter_b or inter_c:
             messagebox.showerror("  ","Error: Column, Row and Value choices must be disjoint.  Try again.")
             return
         
@@ -242,7 +238,6 @@ class goPivot(tk.Toplevel):
 
 if __name__ == "__main__":
     
-    gdata = gd.globalData()
     class solo(tk.Tk):
         def __init__(self):
             super().__init__()
@@ -257,7 +252,8 @@ if __name__ == "__main__":
             #gst = goPivot(self)
         
         def pivD(self,*args):
-            if len(gdata.data) == 0: return
+            if len(gdata.data) == 0:
+                return
             self.gst = goPivot()
             self.gst.syncData()
             #self.ptable = displayPivotTable(self).pack()
@@ -285,4 +281,3 @@ if __name__ == "__main__":
     #fileGetWindow = dr.fileBrowsePreview()
     #df = fileGetWindow.data
     #filename = fileGetWindow.filepath
-    import globalData as gd

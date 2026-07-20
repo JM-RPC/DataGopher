@@ -6,83 +6,32 @@ Created on Tue Apr  2 15:45:31
 @author: Knucklehead
 """
 from tkinter import messagebox
-
 import statsmodels.api  as sm
 import statsmodels.formula.api as smf
 from statsmodels.genmod.generalized_linear_model import SET_USE_BIC_LLF
-SET_USE_BIC_LLF(True) 
-import numpy as np
 import pandas as pd
-    
-
-
 from globalData import gdata
-
-#import warnings
-#Globally treat all RuntimeWarnings as errors
-#warnings.filterwarnings("error", category=RuntimeWarning)
-
-class modelData:
-
-    def __init__(self):
-        self.inputdata = None
-        self.model_vars = None
-        self.fname = None
-        self.indvars = set([])
-        self.depvar = ''
-        self.model_string = '~'
-        self.model_type = 'OLS'
-        self.sig_level = 0.05
-        self.overdispersion = 1.0
-        self.fitdata = None
-        self.modelres = None
-        self.link = ''
-        self.addPredictions = '-'
-        self.LOGSTR = ''
-        
-    def pushlog(self, msg): 
-        self.LOGSTR = self.LOGSTR + '\n' + msg
-        
-    def clearlog(self):
-        self.LOGSTR = ''
-        
-    def modelData_Clear(self):
-        self.inputdata = None
-        self.model_vars = None
-        self.fname = None
-        self.indvars = set([])
-        self.depvar = ''
-        self.model_string = '~'
-        self.model_type = 'OLS'
-        self.sig_level = 0.05
-        self.overdispersion = 1.0
-        self.link = None
-        self.fitdata = None
-        self.modelres = None
-        self.addPredictions = '-'
-        self.LOGSTR = ''
-        
-imdl = modelData()
+SET_USE_BIC_LLF(True) 
 
 LOGSTR = ''
 
 #def runModel(DATA = pd.DataFrame(), MODEL_STRING = '', DEPVAR = '', INDVAR = [],MODEL_TYPE = 'OLS'):
 def goModel():
-    df = imdl.inputdata.copy(deep = True)
-    if (('Predictions' in list(df.columns)) |  ('Residuals' in list(df.columns)) | 
-            ('CI_lb' in list(df.columns)) | ('CI_ub' in list(df.columns)) | 
-            ('PI_lb' in list(df.columns)) |('PI_ub' in list(df.columns))):
+    df = gdata.inputdata.copy(deep = True)
+    if (('Predictions' in list(df.columns)) or  ('Residuals' in list(df.columns)) or 
+            ('CI_lb' in list(df.columns)) or ('CI_ub' in list(df.columns)) or 
+            ('PI_lb' in list(df.columns)) or ('PI_ub' in list(df.columns))):
         bmsg = "One of the names: Predictions, Residuals, CI_lb, CI_up, PI_lb, PI_ub conflicts "
         bmsg += "with one or more variable names. Variables with conflicting names will be overwritten"
         bmsg += "\nFor best results, please change the relevant variable names before running the model.  Continue?"
         if not messagebox.askokcancel("Warning:",bmsg):
             return
     
-    MODEL_STRING = imdl.model_string
-    DEPVAR = imdl.depvar
-    INDVAR = imdl.indvars
-    MODEL_TYPE = imdl.model_type
-    MODEL_LINK = imdl.link
+    MODEL_STRING = gdata.model_string
+    DEPVAR = gdata.depvar
+    INDVAR = gdata.indvars
+    MODEL_TYPE = gdata.model_type
+    MODEL_LINK = gdata.link
     
     if (DEPVAR == ''): 
         gdata.log_It("Dependent Variable unspecified.  Model fit terminated.")
@@ -90,7 +39,6 @@ def goModel():
 
     size0 = len(df)
 
-    #print(f"runModel:: Dependent Var: {DEPVAR}, Independent Var: {','.join(INDVAR)}, \n...Model: {MODEL_STRING}")
     gdata.log_It(f"runModel:: Dependent Var: {DEPVAR}, Independent Var: {','.join(INDVAR)} Model: {MODEL_STRING}")
     
     #manually remove rows containing NaNs in the dependent or independent variables columns
@@ -117,7 +65,6 @@ def goModel():
     no_outcomes = len(outcomes)
     if (no_outcomes <=1):
         gdata.log_It("The dependent variable is a constant.  I'm confused.  Please check and try again.")
-        #print(LOGSTR)
         return(None, None)
     #choose and estimate a model
     STOP = False
@@ -131,7 +78,6 @@ def goModel():
                 STOP = True
         else:
             gdata.log_It("...Logistic Regression Error: dependent variable not binary 0,1 or a 0<=proportion<=1.")
-            #print(LOGSTR)
             STOP=True
     elif (MODEL_TYPE == 'PROBIT'):                        ######PROBIT
         if ((df[DEPVAR].max() <= 1) and (df[DEPVAR].min() >= 0)):
@@ -144,7 +90,6 @@ def goModel():
                 STOP = True
         else:
             gdata.log_It("...Probit ModelError: dependent variable not binary 0,1 or a 0<=proportion<=1.")
-            #print(LOGSTR)
             STOP=True
     elif (MODEL_TYPE == 'GAMMA'):                          ######GAMMA
         if min(outcomes) > 0.0 :
@@ -166,7 +111,6 @@ def goModel():
                 STOP = True
         else:
             gdata.log_It("...Gamma Model Error: dependent variable takes on the value 0 or a negative value.")
-            #print(LOGSTR)
             STOP=True
     elif (MODEL_TYPE == 'OLS'):                             ######OLS
         try:
@@ -175,8 +119,8 @@ def goModel():
         except Exception as er:
             gdata.log_It(f"OLS fit failed. error: {str(er)}")
             STOP = True            
-    elif (MODEL_TYPE== 'POISSON') & (min(outcomes) >=0):    ######POISSON
-        if (min(outcomes) >= 0) & ISINT:
+    elif (MODEL_TYPE== 'POISSON') and (min(outcomes) >=0):    ######POISSON
+        if (min(outcomes) >= 0) and ISINT:
             try:
                 gdata.log_It(f" ...Estimating model: ISINT= {ISINT}, min outcome = {min(outcomes)}")
                 if MODEL_LINK == "Log":
@@ -196,50 +140,72 @@ def goModel():
                 STOP = True
         else:
             gdata.log_It("...Poisson Regression Error: dependent variables are not non-negative integers.")
-            #print(LOGSTR)
             STOP=True
-    elif (MODEL_TYPE == 'NEGATIVE BINOMIAL') & (min(outcomes) >=0):       ######NEGATIVE BINOMIAL
-        if (min(outcomes) >= 0) & ISINT:
+    elif (MODEL_TYPE == 'NEGATIVE BINOMIAL') and (min(outcomes) >=0):       ######NEGATIVE BINOMIAL
+        if (gdata.overdispersion < 0) and (min(outcomes) >= 0) and ISINT:
             try:
-                gdata.log_It(f" ...Estimating model: ISINT= {ISINT}, min outcome = {min(outcomes)}")
+                gdata.log_It("No overdispersion parameter specified for negative binomial.  \n ..using log link and estimating overdispersion.")
+                res = smf.negativebinomial(MODEL_STRING, data=df).fit()
+            except Exception as er:
+                gdata.log_It(f"Negative Binomial Fit Failed. Error: {er}")
+                STOP = True 
+            gdata.code_It(f"\nres=smf.negativebinomial('{MODEL_STRING}', data = df).fit()")           
+        elif (min(outcomes) >= 0) and ISINT:
+            try:
+                gdata.log_It(f" ...Estimating model: ISINT= {ISINT}, min outcome = {min(outcomes)} OverDisp={gdata.overdispersion}")
                 if MODEL_LINK == "Log":
-                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = imdl.overdispersion,link = sm.families.links.Log())).fit()
-                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {imdl.overdispersion},link = sm.families.links.Log())).fit()")
+                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = gdata.overdispersion,link = sm.families.links.Log())).fit()
+                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {gdata.overdispersion},link = sm.families.links.Log())).fit()")
                 elif MODEL_LINK == "Identity":
-                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = imdl.overdispersion,link = sm.families.links.Identity())).fit()
-                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {imdl.overdispersion},link = sm.families.links.Identity())).fit()")
+                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = gdata.overdispersion,link = sm.families.links.Identity())).fit()
+                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {gdata.overdispersion},link = sm.families.links.Identity())).fit()")
                 elif MODEL_LINK == "CLogLog":
-                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = imdl.overdispersion,link = sm.families.links.cloglog())).fit()
-                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {imdl.overdispersion},link = sm.families.links.cloglog())).fit()")
+                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = gdata.overdispersion,link = sm.families.links.cloglog())).fit()
+                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {gdata.overdispersion},link = sm.families.links.cloglog())).fit()")
                 elif MODEL_LINK == "NegativeBinomial":
-                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = imdl.overdispersion,link = sm.families.links.NegativeBinomial())).fit()
-                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {imdl.overdispersion},link = sm.families.links.NegativeBinomial())).fit()")
+                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = gdata.overdispersion,link = sm.families.links.NegativeBinomial())).fit()
+                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {gdata.overdispersion},link = sm.families.links.NegativeBinomial())).fit()")
                 elif MODEL_LINK == "Power":
-                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = imdl.overdispersion,link = sm.families.links.Power())).fit()
-                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {imdl.overdispersion},link = sm.families.links.Power())).fit()")
+                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = gdata.overdispersion,link = sm.families.links.Power())).fit()
+                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {gdata.overdispersion},link = sm.families.links.Power())).fit()")
                 else:
-                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = imdl.overdispersion)).fit()            
-                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {imdl.overdispersion})).fit() ")           
+                    res = smf.glm(formula=MODEL_STRING, data=df, family = sm.families.NegativeBinomial(alpha = gdata.overdispersion)).fit()            
+                    gdata.code_It(f"res = smf.glm(formula='{MODEL_STRING}', data=df, family = sm.families.NegativeBinomial(alpha = {gdata.overdispersion})).fit() ")           
             except Exception as er:
                 gdata.log_It(f"Negative Binomial Fit Failed. Error: {er}")
                 STOP = True            
         else:
             gdata.log_It("...Negative Binomial Regression Error: dependent variables are not non-negative integers.")
-            #print(LOGSTR)
             STOP=True
     else:
         STOP = True
         gdata.log_It("No model or inappropriate model chosen. Choose OLS, GAMMA, LOGIT, POISSON, or NEGATIVE BINOMIAL")
         return(None, None)
     if STOP:
-        #print(LOGSTR)
         messagebox.showerror(' ',"Model fit failed. Check log file.")
         return (None, None)
     # regression succeeded           
     mdl_d = pd.concat([res.model.data.orig_exog,res.model.data.orig_endog],axis = 1).copy(deep = True)
     gdata.code_It("mdl_d = pd.concat([res.model.data.orig_exog,res.model.data.orig_endog],axis = 1).copy(deep = True)")
-    
-    if (MODEL_TYPE != 'OLS') : # if it's not OLS then it's GLM
+    if (MODEL_TYPE == 'NEGATIVE BINOMIAL') and gdata.overdispersion == -1:
+        prediction_res = res.get_prediction(transform = True)
+        res_frame= prediction_res.summary_frame(alpha = 0.05)
+        mdl_d['CI_lb'] =  res_frame['ci_lower']
+        mdl_d['CI_ub'] =  res_frame['ci_upper']
+        #mdl_d['PI_lb'] =  res_frame['obs_ci_lower']
+        #mdl_d['PI_ub'] =  res_frame['obs_ci_upper']
+        mdl_d['Predictions'] = res_frame['predicted']
+        if hasattr(res, "resid_deviance"):
+            vres = res.resid_deviance
+            ylabstr = 'Deviance Residual'
+        else:
+            vres = res.resid_response
+            ylabstr = 'Reponse Residual'
+        mdl_d[ylabstr] = vres
+        #negbin_f = sm.families.NegativeBinomial()
+        #devres = negbin_f.resid_dev(res.model.data.orig_endog,mdl_d['Predictions'])
+        gdata.log_It(f"Residuals: {ylabstr} shape:{vres.shape}\n Resid = {vres}")
+    elif (MODEL_TYPE != 'OLS') : # if it's not OLS then it's GLM
         prediction_res = res.get_prediction(transform = True)
         res_frame= prediction_res.summary_frame(alpha = 0.05)
         mdl_d['CI_lb'] =  res_frame['mean_ci_lower']
@@ -261,6 +227,6 @@ def goModel():
     #gdata.log_It(f"...Model data columns: \n....{','.join(mdl_d.columns)}")
     #gdata.log_It(f"...Extra data columns: \n....{','.join(addoncols)}")
     mdl_d = pd.concat([mdl_d,df[addoncols]],axis = 1)
-    #print(f" In goModel modelsttring = {imdl.model_string}")
+
 
     return mdl_d, res

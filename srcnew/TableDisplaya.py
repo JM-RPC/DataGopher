@@ -7,12 +7,9 @@ Created on Fri Dec  5 19:20:36 2025
 """
 
 import tkinter as tk
-from tkinter import ttk
 import pandas as pd
-import os
-import globalData as gd
 from globalData import gdata
-from tkinter import filedialog, ttk
+from tkinter import filedialog
 
 class displayFrame_txt(tk.Frame):    
     def __init__(self,parent,Pivot_Table = None):  
@@ -22,7 +19,7 @@ class displayFrame_txt(tk.Frame):
         #self.config(width = 800, height = 450)
         self.pack(side = tk.TOP) 
         #self.grid(row=5, column = 0, columnspan = 5)
-        titlestr = f"                                       Preview                                             "
+        titlestr = "                                       Preview                                             "
         self.titlelabel = tk.Label(self,text = titlestr, fg = 'white', bg = 'blue').pack(side = tk.TOP, expand = True, fill = tk.X)
         # now make it scroll
         self.filepath = ""
@@ -100,16 +97,19 @@ if __name__ == "__main__":
             #gst = goPivot(self)
         
         def showData_1(self,*args):
-            if len(gdata.data) == 0: return
+            if len(gdata.data) == 0:
+                return
             self.tbldisp.do_display(gdata.data)
 
         def showData_2(self,*args):
-            if len(gdata.data) == 0: return
+            if len(gdata.data) == 0:
+                return
             self.txdisp.do_display(gdata.data)
 
 
         def showData_3(self,*args):
-            if len(gdata.data) == 0: return
+            if len(gdata.data) == 0:
+                return
             self.dfdisp.do_display(gdata.data)
 
 
@@ -138,6 +138,5 @@ if __name__ == "__main__":
     #fileGetWindow = dr.fileBrowsePreview()
     #df = fileGetWindow.data
     #filename = fileGetWindow.filepath
-    import globalData as gd
 
 

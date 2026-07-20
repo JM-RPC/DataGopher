@@ -6,7 +6,7 @@ Created on Wed Aug 27 21:49:03 2025
 @author: Knucklehead
 """
 
-from patsy import dmatrices, dmatrix, NAAction
+from patsy import dmatrix, NAAction
 import tkinter as tk
 from tkinter import  messagebox
 from tkinter import filedialog, ttk
@@ -23,6 +23,9 @@ from globalData import gdata
 import TableDisplayc as ptc
 
 import Listwidget as lw
+
+#import io
+import re
 
 
 def doDesign(MODEL_STRING = '', DATA = None, APPEND = True):
@@ -67,26 +70,11 @@ class goData(tk.Toplevel):
 #class goData(tk.Tk):
     def __init__(self,parent):
         super().__init__(master=parent)
-    #def __init__(self,parent):
-        #super().__init__(master=parent)
         
-        
-
         self.title("Data Wrangler Prototype") 
         self.geometry('1280x880+0+0')
         self.filepath = ''
         self.outdata = pd.DataFrame()
-################This is the global copy of the data##############
-        # if not gdata.data.empty:
-        #     self.data = gdata.data.copy(deep = True)
-        #     #self.data0 = gdata.data.copy(deep = True)   
-        #     self.filepath = gdata.fpath
-        # else:   
-        #     #self.data0 = pd.DataFrame() #spare copy of the original data
-        #     self.data = pd.DataFrame() #the current data
-##################################################################
-       
-        self.data = pd.DataFrame() #the current data
 
         self.filelabel = tk.Label(self,text = self.filepath)
         self.filelabel.grid(row = 0, column = 0, rowspan = 3, columnspan = 6,  sticky ='n', padx = 10)
@@ -106,8 +94,19 @@ class goData(tk.Toplevel):
 
         self.pframe = ttk.Frame(self)
         self.pframe.grid(row=11, column = 0, columnspan = 5)
-        self.dfrm = ptc.DataFrameTreeView(self.pframe)
-        self.dfrm.pack(side = tk.TOP, pady=20, padx=20, fill = tk.BOTH, expand = True)
+
+        self.pframe1 = tk.Frame(self.pframe)
+        self.pframe1label = tk.Label(self.pframe1, text = "Data").pack(side = tk.TOP)
+        self.dfrm = ptc.DataFrameTreeView(self.pframe1)
+        self.dfrm.pack(side = tk.TOP,  fill = tk.BOTH, expand = True) #pady=20, padx=20,l
+        self.pframe1.pack(side=tk.LEFT)
+
+        self.pframe2 = tk.Frame(self.pframe,borderwidth=2, relief="ridge", highlightthickness=1)
+        self.pframe2label = tk.Label(self.pframe2, text = "New Data").pack(side = tk.TOP)
+        self.dfrm2 = ptc.DataFrameTreeView(self.pframe2)
+        self.dfrm2.pack(side = tk.TOP,  fill = tk.BOTH, expand = True) #pady=20, padx=20,
+        self.pframe2.pack(side = tk.LEFT,  fill = tk.BOTH, expand = True) #pady=10, padx=10,
+        self.pframe2.pack_forget()
         
         # Configure grid weights to allow expansion
         self.rowconfigure(12, weight=1)
@@ -119,6 +118,7 @@ class goData(tk.Toplevel):
         self.filterer_ind = False
         self.columnDropper_ind = False
         self.reFormer_ind = False
+        self.mergeIt_ind = False
         
         self.syncData()
         
@@ -143,24 +143,19 @@ class goData(tk.Toplevel):
         pass
         #not currently used. It's less confusing to simply read the data in again if you get stuck
         #restore from disk
-        #if len(self.data0) == 0: return
-        #self.data = self.data0.copy(deep = True)
-        #self.dfrm.do_display(self.data)
         
     def saveData(self, *args):
+        #altered or new data in in gdata.data
         file_path = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes=[('Text Files', '*.txt'), ('All Files', '*.*'), ('CSV Files', '*.csv')],
             #initialfile = f"goData_{str(datetime.now()).replace(' ','_')}.csv"
-            initialfile = f"DG_Data_{datetime.now().strftime("%Y-%m-%d@%H*%M*%S")}.csv"
+            initialfile = f"DG_Data_{datetime.now().strftime('%Y-%m-%d@%H*%M*%S')}.csv"
         )
         #if (file_path == ''): return
         gdata.log_It(f"data.to_csv({file_path}, index=False)")
-        #self.data.to_csv(file_path, index=False)
-        self.data.to_csv(file_path, index=False)
-        
+        gdata.data.to_csv(file_path, index=False)
         #force a reset to synchronize on the newly saved data
-        gdata.reset_Data(nupath=file_path, data_in=self.data)
         gdata.log_It(f"Data Synchronized to saved file: {file_path})")
         self.filelabel.config(text = gdata.fpath + f"   #Rows = {len(gdata.data)} #Columns = {len(gdata.data.columns)}")
         if len(gdata.data) <= 5000000:
@@ -179,91 +174,98 @@ class goData(tk.Toplevel):
             self.master.dpivot.syncData()
         if self.master.plotOn:
             self.master.ddraw.syncData()
+        if self.master.dataOn:
+            self.syncData()
         
     def syncData(self,*args):
         #syncrhonize everything inside goData to the data file contained in 
         #gdata.data -- if it is not empty.
         #restart transformer, renamer, and filterer
-        #print(f"data filter: syncData called file:{gdata.fpath}, rows = {len(gdata.data)} ")
+
         
         #if gdata.data is empty, then stand down otherwise copy it into a local (goDataFilter only)
         #data frame
+
         if not gdata.data.empty:
             self.data =  gdata.data
             #self.data0 = gdata.data
-            file_path = gdata.fpath
+            #file_path = gdata.fpath
         else:
             return
-        #gdata is live, self.data has been synced, 
-        #now restart instances of dataTransformer, dataRename, dataFilter, reFormData  as needed
+        #gdata is live
+        #now restart instances of dataTransformer, dataRename, dataFilter, reFormData, dropColumn, and mergeIt as needed
         if self.transformer_ind:
             self.transformer.destroy()
             self.transformer_ind = False
         self.transformer = dataTransform(self)
         self.transformer_ind = True
-        self.transformer.grid(row = 2, column = 0, columnspan = 10, sticky = 'w')
+        self.transformer.grid(row = 2, column = 0, columnspan = 8, sticky = 'w')
         
         if self.renameit_ind:
             self.renameit.destroy()
             self.renameit_ind = False
         self.renameit = dataRename(self)
-        self.renameit.grid(row = 4, column = 0, columnspan = 10,sticky = 'w')
+        self.renameit.grid(row = 4, column = 0, columnspan = 8,sticky = 'w')
         self.renameit_ind = True
             
         if self.filterer_ind:
             self.filterer.destroy()
             self.filterer_ind = False
         self.filterer = dataFilter(self)
-        self.filterer.grid(row = 6, column = 0, columnspan = 3, sticky = 'w')
+        self.filterer.grid(row = 6, column = 0, columnspan = 4, sticky = 'w')
         self.filterer_ind = True
 
         if self.reFormer_ind:
             self.reFormer.destroy()
             self.reFormer_ind = False
         self.reFormer = reFormData(self)
-        self.reFormer.grid(row = 8, column = 0, columnspan = 3, sticky = 'w')
+        self.reFormer.grid(row = 8, column = 0, columnspan = 4, sticky = 'w')
         self.reFormer_ind = True
         
         if self.columnDropper_ind:
             self.columnDropper.destroy()
             self.dropcolumn_ind = False
         self.columnDropper = dropColumns(self)
-        self.columnDropper.grid(row = 8, column = 3, columnspan = 3, sticky = 'w')
+        self.columnDropper.grid(row = 8, column = 3, columnspan = 4, sticky = 'w')
         self.columnDropper_ind = True
+        
+        if self.mergeIt_ind:
+            self.mergeIt.destroy()
+            self.mergeIt_ind = False
+        self.mergeIt = mergeData(self)
+        self.mergeIt.grid(row=9, column = 0, columnspan=8, sticky = 'w')
+        self.mergeIt_ind = True
+
 
         self.dfrm.do_display(self.data)
+        #self.dfrm2.pack_forget()
+        self.pframe2.pack_forget()
+
             
         self.filelabel.config(text = gdata.fpath + f"   #Rows = {len(gdata.data)} #Columns = {len(gdata.data.columns)}")
 
-        #print(f"\nat sync data: {list(self.data.columns)}")
 
-        self.transformer.options['values'] = list(self.data.columns)
-        self.filterer.options['values'] = list(self.data.columns)
-        self.renameit.options['values'] = list(self.data.columns)
-        self.reFormer.row_widget.resetList(NUCHOICES=list(self.data.columns))
-        self.columnDropper.drop_widget.resetList(NUCHOICES = list(self.data.columns))
-        #self.reFormer.col_widget.resetList(NUCHOICES=list(self.data.columns))
-        self.master.varlist0 = list(self.data.columns)
+
 
         return
         
-    def goRename(self):
-        self.renameit = dataRename(self)
-        self.renameit.grid(row = 5, column = 0, columnspan = 5)
+#    def goRename(self):
+#        self.renameit = dataRename(self)
+#        self.renameit.grid(row = 5, column = 0, columnspan = 5)
         
 class dropColumns(tk.Frame):
     def __init__(self,parent):
         super().__init__(master=parent)
         self.configure(borderwidth=2, relief="ridge", highlightthickness=2)
-        self.data = self.master.data.copy(deep = True)
-        if len(self.data) > 0:
+
+        if len(gdata.data) > 0:
             colnames = list(gdata.data.columns)
-            numcolnames = [item for item in colnames if is_numeric_dtype(gdata.data[item])]
+            #numcolnames = [item for item in colnames if is_numeric_dtype(gdata.data[item])]
         else:
             colnames = []
-            numcolnames = []
+            #numcolnames = []
             return
-
+        
         self.droplist = []
         self.dw = ttk.Frame(self)
         
@@ -278,12 +280,12 @@ class dropColumns(tk.Frame):
         idv = self.drop_widget.rowlist
         if len(idv) == 0:
             return
-        self.data = self.master.data.copy(deep = True)
-        dfnew = self.data.drop(columns = idv)
+        dfnew = gdata.data.drop(columns = idv)
+        gdata.code_It(f"df = df.drop(columns = {idv})")
         ########################################################## 
         ###  Display the results           
         #self.master.dfrm.do_display(self.master.data)  
-        self.master.dfrm.do_display(self.data)
+        self.master.dfrm.do_display(dfnew)
         #self.master.filelabel.config(text = gdata.fpath + f"   #Rows = {len(gdata.data)} #Columns = {len(gdata.data.columns)}")
         self.master.filelabel.config(text = gdata.fpath + f"   #Rows = {len(dfnew)} #Columns = {len(dfnew.columns)}")
         
@@ -291,11 +293,8 @@ class dropColumns(tk.Frame):
         ###########################################################
         ##### Update global data structures
         gdata.log_It(f"...Success!  number of rows: {len(dfnew)} number of columns: {len(dfnew.columns)}")
-        self.data = dfnew.copy(deep = True) #update the copy local to dropColumns class
-        self.master.data = dfnew.copy(deep = True) #move transformed data back to parent class
-        gdata.put_Data(self.master.data) #update global copy of the data
-        self.master.syncData()
-
+        gdata.put_Data(dfnew) #update global copy of the data
+        self.master.broadcastData()
         return
         
 class reFormData(tk.Frame):
@@ -303,16 +302,14 @@ class reFormData(tk.Frame):
         super().__init__(master = parent)
         self.configure(borderwidth=2, relief="ridge", highlightthickness=2)
         #self.title('ReForm Data')
-        self.droplist = []
-
         if len(gdata.data) > 0:
             colnames = list(gdata.data.columns)
-            numcolnames = [item for item in colnames if is_numeric_dtype(gdata.data[item])]
+            #numcolnames = [item for item in colnames if is_numeric_dtype(gdata.data[item])]
         else:
             colnames = []
-            numcolnames = []
+            #numcolnames = []
             return
-
+            
         self.rowlist = []
         self.collist = []
         self.vallist = []
@@ -341,30 +338,22 @@ class reFormData(tk.Frame):
         pass
     
     def doreForm(self,*args):
-        ########################################
-        ##  Get the data frame
-        self.data = self.master.data
-        ########################################
+        df = gdata.data
         dfnew = pd.DataFrame()
         idv = self.row_widget.rowlist
-        print("idv:")
-        print(idv)
         #valv = [item for item in dfnew.columns if item not in idv] #self.col_widget.rowlist
         valv = self.col_widget.rowlist
-        print("valv:")
-        print(valv)
         if bool(set(idv) & set(valv)):
             messagebox.showerror("  ", "Error: ID and Value Choices must be disjoint.")
             return
-        gdata.log_It(f"Attempting data reshape: ")
+        gdata.log_It("Attempting data reshape: ")
         gdata.log_It(f"dfnew = pandas.melt(data, id_vars = {idv}, value_vars = {valv})")
         try:
-            #dfnew = pd.melt(self.data, id_vars = idv, value_vars = valv)
             if len(valv) >0:
-                dfnew = pd.melt(self.data, id_vars = idv, value_vars = valv, var_name = '_variable', value_name = '_value')
+                dfnew = pd.melt(df, id_vars = idv, value_vars = valv, var_name = '_variable', value_name = '_value')
                 gdata.code_It(f"dfnew = pd.melt(df, id_vars = {idv}, value_vars = {valv}, var_name = '_variable', value_name = '_value')")
             else:
-                dfnew = pd.melt(self.data, id_vars = idv, var_name = '-variable', value_name = '_value')
+                dfnew = pd.melt(df, id_vars = idv, var_name = '-variable', value_name = '_value')
                 gdata.code_It(f"dfnew = pd.melt(df, id_vars = {idv}, var_name = '_variable', value_name = '_value')")
 
         except Exception as er:
@@ -384,22 +373,113 @@ class reFormData(tk.Frame):
         ###########################################################
         ##### Update global data structures
         gdata.log_It(f"...Success!  number of rows: {len(dfnew)} number of columns: {len(dfnew.columns)}")
-        self.data = dfnew.copy(deep = True)
-        self.master.data = dfnew.copy(deep = True) #move transformed data back to parent
-        gdata.put_Data(self.master.data) #update global copy of the data
-        self.master.syncData()
+        gdata.put_Data(dfnew) #update global copy of the data
+        self.master.broadcastData()
         
-        # self.master.transformer.options['values'] = list(self.data.columns)
-        # self.master.filterer.options['values'] = list(self.data.columns)
-        # self.master.renameit.options['values'] = list(self.data.columns)
-        #self.row_widget.resetList(NUCHOICES=list(self.data.columns))
-        #self.col_widget.resetList(NUCHOICES=list(self.data.columns))
-        # self.master.varlist0 = list(self.data.columns)
-        self.master.broadcastData(self)
+
+class mergeData(tk.Frame):
+    def __init__(self,parent):
+        super().__init__(master = parent)
+
+        self.mergedata = pd.DataFrame()
+        self.mergekey = []
+
+        self.fm = ttk.Frame(self)
+        self.merge_type = tk.StringVar()
+        self.merge_type.set('inner')
+
+        self.configure(borderwidth = 2, relief="ridge", highlightthickness=2)
+        self.mergelabel = tk.Label(self.fm,text="Merge a data file into the current data:", fg = 'white', bg = 'blue')
+        self.mergelabel.grid(row=0, column=0,columnspan = 2,sticky='w')
+        self.mergeButton = tk.Button(self.fm,text= "Do Merge", command = self.doMerge)
+        self.mergeButton.grid(row = 0, column = 5, sticky = 'w')
+        
+
+        self.mergeFileButton = tk.Button(self.fm, text="Choose Merge File", command = self.getData2)
+        self.mergeFileButton.grid(row = 1, column=0,sticky='w')
+        self.mge_type_lab = tk.Label(self.fm, text = "Merge Type:").grid(row = 2, column = 3)
+        self.mergetype = tk.Radiobutton(self.fm,text = 'inner', variable = self.merge_type, value = 'inner', command = self.update_mtype)
+        self.mergetype.grid(row = 2, column = 4, sticky='w')
+        self.mergetype = tk.Radiobutton(self.fm,text = 'outer', variable = self.merge_type, value = 'outer', command = self.update_mtype)
+        self.mergetype.grid(row = 2, column = 5, sticky='w')
+        self.mergetype = tk.Radiobutton(self.fm,text = 'left', variable = self.merge_type, value = 'left', command = self.update_mtype)
+        self.mergetype.grid(row = 2, column = 6, sticky='w')
+        self.mergetype = tk.Radiobutton(self.fm,text = 'right', variable = self.merge_type, value = 'right', command = self.update_mtype)
+        self.mergetype.grid(row = 2, column = 7, sticky='w')
+        self.mergeDatalabel = tk.Label(self.fm,text="None")
+        self.mergeDatalabel.grid(row=1, column=1,sticky='w')
+        #self.mergeKeylabel = tk.Label(self.fm, text="Choose merge keys:")
+        #self.mergeKeylabel.grid(row=2, column = 1, sticky='w')
+        self.keypicker = lw.goList(self.fm, TEXT = 'Key:', CHOICES = self.mergekey)
+        self.keypicker.grid(row = 2, column = 0,columnspan=3, sticky = 'w')
+
+        self.fm.pack(side =tk.TOP)
 
 
+    def getData2(self):
+        #This is a copy of getData from DataGopher.py.
+        df = None
+        filepath = None
+        df,filepath = gdata.getData()
+        if df is None: 
+            return
+        lstr = f"dfm = pd.read_csv('{filepath}', engine='python')"
+        gdata.code_It(lstr)
+        #df_in = pd.read_csv(file_path)
+        self.fpath = filepath
+        self.mergedata = df.copy(deep = True)
+        self.mergeDatalabel.config(text=self.fpath)
+        self.mergekey = [item for item in self.mergedata.columns if item in gdata.data.columns]
+        if len(self.mergekey) > 0:
+            self.keypicker.resetList(NUCHOICES = self.mergekey)
+        else:
+            messagebox.showerror(title = ' ', message="The data sets have no common columns cannot merge")
+        
+        self.master.dfrm2.do_display(df)
+        #self.master.dfrm2.pack(side = tk.LEFT, pady=20, padx=20, fill = tk.BOTH, expand = True)
+        self.master.pframe2.pack(side = tk.LEFT, pady=20, padx=20, fill = tk.BOTH, expand = True)
+
+        return
+
+    def doMerge(self, *args): 
+        if len(self.mergekey) == 0:
+            messagebox.showerror(title=' ', message="No common columns for merger. \n...You must have heard this before.")
+            return
+        for item in self.mergekey:
+            try:
+                self.mergedata[item] = self.mergedata[item].astype(gdata.data[item].dtype)
+            except Exception as er:
+                messagebox.showerror(title = ' ', message=f"Could not coerse key {item} to be the same type in both dataframes.\n {er}.")
+                return
+        try:
+            dfnu = pd.merge(gdata.data, self.mergedata, on = self.mergekey, how=self.merge_type.get(), validate = '1:1')    
+        except Exception as er:
+            messagebox.showerror(title=' ', message=f"Merge failed: error{er}")
+            return
+        if len(dfnu) == 0:
+            messagebox.showerror(title=' ', message="The merge yielded no columns, try again!")
+            return
+        for item in self.mergekey:
+            gdata.code_It(f"self.mergedata['{item}']=self.mergedata['{item}'].astype(gdata.data['{item}'].dtype")
+        gdata.code_It(f"dfnu = pd.merge(df,dfm, on ='{self.mergekey}', how='{self.merge_type.get()}', validate = '1:1')")
+        gdata.code_It("df = dfnu.copy(deep=True)")
+        #update the data frame and display it
+        ########################################################## 
+        ###  Display the results           
+        #self.master.dfrm.do_display(self.master.data)  
+        self.master.dfrm.do_display(dfnu)
+        #self.master.filelabel.config(text = gdata.fpath + f"   #Rows = {len(gdata.data)} #Columns = {len(gdata.data.columns)}")
+        self.master.filelabel.config(text = gdata.fpath + f"   #Rows = {len(dfnu)} #Columns = {len(dfnu.columns)}")
+        ###########################################################
+        ##### Update global data structures
+        gdata.log_It(f"...Success!  number of rows: {len(dfnu)} number of columns: {len(dfnu.columns)}")
+        gdata.put_Data(dfnu) #update global copy of the data
+        self.master.broadcastData()
+        return   
 
 
+    def update_mtype(self, *args):
+        pass
 
 class dataRename(tk.Frame):
     def __init__(self,parent):
@@ -407,10 +487,13 @@ class dataRename(tk.Frame):
         #self.reButton = tk.Button(self, text = 'Rename a Variable', command= self.setupRename)
         #self.reButton.grid(row =0, column=0)
         #self.setupRename()
+        
+        varlist0 = list(gdata.data.columns)   
+        
         self.configure(borderwidth=2, relief="ridge", highlightthickness=2)
         self.renamelabel = tk.Label(self,text = "Rename Variables:", fg = 'white', bg = 'blue')
         self.renamelabel.grid(row  = 0, column = 0, columnspan =5)
-        varlist0 = list(self.master.data.columns)
+
         self.selected_variable  = tk.StringVar()
         self.vname = tk.StringVar()
         self.Label0 = tk.Label(self,text = "Rename Variables:", fg = 'white', bg = 'blue')
@@ -433,29 +516,17 @@ class dataRename(tk.Frame):
         self.vname.set(self.selected_variable.get())
         
     def goChange(self, *args):
-        if self.vname.get() in list(self.master.data.columns):
+        if self.vname.get() in list(gdata.data.columns):
             messagebox.showerror("  ", "Sorry, that name is aready in use.  Try again.")
             return
-        ##############Change the required master data and options in transformer  and filterer
+        ##############Change the required master data 
+
         gdata.code_It("df.rename(columns= {" + f"'{self.selected_variable.get()}': '{self.vname.get()}'" + "}, inplace = True)")
-        self.master.data.rename(columns = {self.selected_variable.get():self.vname.get()}, inplace = True)
+        gdata.data.rename(columns = {self.selected_variable.get():self.vname.get()}, inplace = True)
         
-        gdata.put_Data(self.master.data)
-        #self.master.data = self.data.copy(deep = True) #move transformed data back to parent
         self.master.broadcastData(self)
         gdata.log_It(f"Changed variable name from: {self.selected_variable.get()} to:{self.vname.get()}")
-
-        #change the list options in the filter, transform, rename, reform, and drop widgets   
-        self.master.transformer.options['values'] = list(self.master.data.columns)
-        self.master.filterer.options['values'] = list(self.master.data.columns)
-        self.options['values'] = list(self.master.data.columns)
-        self.selected_variable.set('')
-        self.master.dfrm.do_display(self.master.data)    
-        self.master.reFormer.row_widget.resetList(NUCHOICES=list(self.master.data.columns))
-        self.master.reFormer.col_widget.resetList(NUCHOICES=list(self.master.data.columns))
-        self.master.columnDropper.drop_widget.resetList(NUCHOICES=list(self.master.data.columns))
-
-        
+        #print(f"gdata.columns: {list(gdata.data.columns)} ")
 
 class dataTransform(tk.Frame):
     def __init__(self,parent,DFRAME = None):  
@@ -465,10 +536,9 @@ class dataTransform(tk.Frame):
         self.configure(borderwidth=2, relief="ridge", highlightthickness=2)
 
 ################This is the master copy of the data##############
-        #self.data = self.master.data.copy(deep = True)
-        self.varlist0 = list(self.master.data.columns) #the original column names 
+        self.varlist0 = list(gdata.data.columns) #the original column names 
 ##################################################################
-        
+      
         self.test_label = tk.Label(self, text="Create New Variables:", fg = 'white', bg = 'blue')
         self.test_label.grid(row=2, column=0, sticky = 'w')
         
@@ -491,42 +561,16 @@ class dataTransform(tk.Frame):
     def run_dmatrices(self, *args): 
         mstr = self.meqn.get()        
         gdata.log_It(f"doDesign(MODEL_STRING = {mstr}, Data = dataframe)")
-        res = doDesign(MODEL_STRING = mstr, DATA = self.master.data, APPEND=True)  
+        res = doDesign(MODEL_STRING = mstr, DATA = gdata.data, APPEND=True)  
         if (res is not None):
             self.master.dfrm.do_display(res)
-            #self.data = res.copy(deep = True)    
 ############Updating master copy of data and the variable options lists in dataFilter and dataTransform########################           
-            #self.master.data = self.data.copy(deep = True) #move transformed data back to parent
-            self.master.data = res.copy(deep=True)
-            gdata.put_Data(self.master.data)
+            gdata.put_Data(res)
             gdata.code_It("df = dfout.copy(deep=True)")
-            
-        #change the list options in the filter, transform, rename, and reform widgets   
-
-            self.master.filterer.options['values'] = list(self.master.data.columns)
-            self.master.renameit.options['values'] = list(self.master.data.columns)
-            self.master.reFormer.row_widget.resetList(NUCHOICES=list(self.master.data.columns))
-            self.master.reFormer.col_widget.resetList(NUCHOICES=list(self.master.data.columns))
-            self.master.columnDropper.drop_widget.resetList(NUCHOICES=list(self.master.data.columns))
-            self.options['values'] = list(self.master.data.columns)
-            self.master.varlist0 = list(self.master.data.columns)
-            self.master.broadcastData(self)
-            #update number of  rows and columns on data Wrangle Data panel
-            self.master.filelabel.config(text = gdata.fpath + f"   #Rows = {len(gdata.data)} #Columns = {len(gdata.data.columns)}")
+            self.master.broadcastData()
         else:
             gdata.log_It(f"Wrangle DATA: Variable Transformation {mstr} Failed.")
-            #reset the list options in the filter, transform, rename, and reform widgets   
-            self.meqn.set('')
-            self.master.filterer.options['values'] = list(self.master.data.columns)
-            self.master.renameit.options['values'] = list(self.master.data.columns)
-            self.master.reFormer.row_widget.resetList(NUCHOICES=list(self.master.data.columns))
-            self.master.reFormer.col_widget.resetList(NUCHOICES=list(self.master.data.columns))
-            self.master.columnDropper.drop_widget.resetList(NUCHOICES=list(self.master.data.columns))
-            self.options['values'] = list(self.master.data.columns)
-            self.master.varlist0 = list(self.master.data.columns)
-            self.master.broadcastData(self)
-            #update number of  rows and columns on data Wrangle Data panel
-            self.master.filelabel.config(text = gdata.fpath + f"   #Rows = {len(gdata.data)} #Columns = {len(gdata.data.columns)}")
+            self.master.syncData() #return local (goData) class to original condition
 
 ##################################################################
         return
@@ -537,10 +581,11 @@ class dataTransform(tk.Frame):
         return
     
     def varupdate(self,event):
-        varlist0 = list(self.master.data.columns)
+        varlist0 = list(gdata.data.columns)
         current_varlist = str(self.meqn.get()).split('+')
         #nuisance: apparently, if split finds an empty string it returns [''], not []
-        if current_varlist[0] == '': current_varlist.pop(0)
+        if current_varlist[0] == '':
+            current_varlist.pop(0)
         newvar = str(self.selected_variable.get())
         #add newvar to the list of current variables if it is new
         if newvar in current_varlist:
@@ -563,13 +608,13 @@ class dataFilter(tk.Frame):
         #parent data is now accessible in self.parent.zzz
         self.filterindicator = tk.StringVar(self,'No')
 ############This is the master copy of data ########################           
-        self.data = self.master.data
+        self.data = gdata.data
 ####################################################################
-        self.varlist0 = list(self.master.data.columns)
+
+        self.varlist0 = list(self.data.columns)
         self.varlistnum = [item for item in self.data.columns if is_numeric_dtype(self.data[item])]
         self.nudata = pd.DataFrame()
-        
-      
+    
         self.fltr_type=tk.StringVar(self)
         self.fl0 = tk.Frame(self)
         #self.fl0.configure(borderwidth=2, relief="flat", highlightthickness=1)
@@ -604,9 +649,9 @@ class dataFilter(tk.Frame):
         # if the selected filter type is numeric, then eliminate non-numerical variables from consideration
         fltr_type = self.fltr_type.get()
         self.selected_variable.set('')
-        varlist0 = list(self.master.data.columns)
+        varlist0 = list(self.data.columns)
         if fltr_type == 'Numeric' :
-            self.options['values'] = [item for item in varlist0 if is_numeric_dtype(self.master.data[item])]
+            self.options['values'] = [item for item in varlist0 if is_numeric_dtype(self.data[item])]
             self.fl1.pack(side = tk.TOP)
         elif fltr_type == 'Categorical' :
             self.options['values'] = varlist0
@@ -630,15 +675,19 @@ class dataFilter(tk.Frame):
             self.fl1.pack_forget()
             self.fltr_type.set('')
             return           
-############This is the master copy of the current data ########################           
-        self.data = self.master.data.copy(deep = True)
+############This a local to dataFilter copy of the data ############           
+            self.data = gdata.data.copy(deep = True)
 ####################################################################
         if self.fltr_type.get() == 'Categorical' :
             #filterlist = self.flt.meqn.get().split(',')
             filterlist = self.flt.invalues
             filtervar = self.selected_variable.get() 
             #TODO: find a better way to keep the index in sync with choice list
+            #use a lambda function to convert the column corresponding to filtervar to strings
+            #Then test each entry in resulting series of strings to see if it is in the filterlist
+            #rowchoice records the logical outcome for each entry in data[filtervar]
             rowchoice = pd.Series(map(lambda x:str(x),self.data[filtervar])).isin(filterlist)
+            #give rowchoice the same index as the dataframe
             rowchoice.index = self.data.index
             gdata.code_It(f"rowchoice = pd.Series(map(lambda x:str(x), df['{filtervar}'])).isin({filterlist})")
             self.nudata = self.data.loc[rowchoice]
@@ -649,8 +698,8 @@ class dataFilter(tk.Frame):
             try:
                 filterlower = float(self.flt.lowerlim.get())
                 filterupper = float(self.flt.upperlim.get())
-            except: #if the float cast fails, revert to the upper and lower limits of the variable (no filtering)
-                messagebox.showerror(' ', "Numerical filter upper or lower bound could not be interpreted.  Reverting to variable upper and lower bounds.")
+            except Exception as er: #if the float cast fails, revert to the upper and lower limits of the variable (no filtering)
+                messagebox.showerror(' ', f"{er} Numerical filter upper or lower bound could not be interpreted.  \nReverting to variable upper and lower bounds.")
                 filterlower = np.nanmin(self.data[filtervar])
                 self.flt.lowerlim.set(str(filterlower))
                 filterupper = np.nanmax(self.data[filtervar])
@@ -672,7 +721,7 @@ class dataFilter(tk.Frame):
         gdata.log_It(f"Filter finished. Rows remaining: {len(self.nudata)}")
                   
         self.master.dfrm.do_display(self.nudata)
-        self.master.data = self.nudata.copy(deep = True)
+
         gdata.code_It("df = nudata.copy(deep=True)")
         gdata.put_Data(self.nudata)
         self.master.broadcastData(self)
@@ -684,9 +733,11 @@ class dataFilter(tk.Frame):
         vnm = self.selected_variable.get()
         filter_type = self.fltr_type.get()
         #self.flt.in_or_out.set('')
-        if vnm == '' : return
-        if (self.filterindicator.get() == 'Yes'): self.flt.destroy()
-        rownames = list(self.master.data[vnm].unique())
+        if vnm == '' :
+            return
+        if (self.filterindicator.get() == 'Yes'):
+            self.flt.destroy()
+        #rownames = list(self.master.data[vnm].unique())
         if filter_type == 'Numeric':
             self.flt = fVar_num(self, self.master)
             self.flt.in_or_out.set('Inside')
@@ -734,11 +785,11 @@ class fVar_num(tk.Frame):
         self.ubfltr = tk.Entry(self,textvariable = self.upperlim, width = 20)
         self.ubfltr.grid(row = 1, column = 3)
         
-        self.inoroutLabel = tk.Label(self, text="Filter Action:").grid(row =3, column = 0, sticky = 'w')
+        self.inoroutLabel = tk.Label(self, text="Rows to keep:").grid(row =3, column = 0, sticky = 'w')
         self.in_or_out=tk.StringVar(self)
-        self.fltrradio2 = tk.Radiobutton(self,text = 'Inside the specified bounds', variable = self.in_or_out, value = 'Inside')
+        self.fltrradio2 = tk.Radiobutton(self,text = 'Inside the specified limits', variable = self.in_or_out, value = 'Inside')
         self.fltrradio2.grid(row=3, column = 1, sticky = 'w')
-        self.fltrradio2 = tk.Radiobutton(self,text = 'Outside the specified bounds', variable = self.in_or_out, value = 'Outside')
+        self.fltrradio2 = tk.Radiobutton(self,text = 'Outside the specified limits', variable = self.in_or_out, value = 'Outside')
         self.fltrradio2.grid(row = 3, column = 2, sticky = 'w')
 
     def do_cancel(self):
@@ -828,8 +879,10 @@ class fVar_cat(tk.Frame):
         
     def varupdate_in(self,event):
         nuvar = self.selected_in.get()
-        if (nuvar in self.outvalues): return
-        if not(nuvar in self.invalues): return
+        if (nuvar in self.outvalues):
+            return
+        if nuvar not in self.invalues:
+            return
         self.invalues.remove(nuvar)
         self.outvalues.append(nuvar)
         self.catselect_in['values'] = self.invalues
@@ -839,8 +892,10 @@ class fVar_cat(tk.Frame):
        
     def varupdate_out(self,event):
         nuvar = self.selected_out.get() #this will always be a string
-        if not(nuvar in  self.outvalues): return
-        if (nuvar in  self.invalues): return
+        if nuvar not in  self.outvalues:
+            return
+        if (nuvar in  self.invalues):
+            return
         self.outvalues.remove(nuvar)
         self.invalues.append(nuvar)
         self.catselect_in['values'] = self.invalues
@@ -855,8 +910,20 @@ class fVar_cat(tk.Frame):
 
 
 
+
 if __name__ == "__main__":
-    
+    def checkName(namestr):
+        if type(namestr) is not str: 
+            gdata.log_It(f"{namestr} not interpretable as a string.")
+            return(str(namestr))
+        match0 = re.match(r'[0-9]',namestr)
+        if match0 is not None:
+            return namestr
+        match1 = re.search(r'[^a-zA-Z0-9_]',namestr)
+        if match1 is not None:
+            return namestr
+        return None
+
     gdata = gd.globalData()
     class solo(tk.Tk):
         def __init__(self):
@@ -868,12 +935,14 @@ if __name__ == "__main__":
             self.pivotOn = False
             self.regOn = False
             self.plotOn = False
+            self.dataOn = True
 
             
             #gst = goPivot(self)
         
         def filterD(self,*args):
-            if len(gdata.data) == 0: return
+            if len(gdata.data) == 0:
+                return
             self.gst = goData(self)
             self.gst.syncData()
             
@@ -883,20 +952,18 @@ if __name__ == "__main__":
                 defaultextension=".txt",
                 filetypes=[('Text Files', '*.txt'), ('All Files', '*.*'), ('CSV Files', '*.csv')],
                 #initialfile = f"DG_LOG_{str(datetime.now()).replace(' ','_')}.txt"
-                initialfile = f"DG_LOG_{datetime.now().strftime("%Y-%m-%d@%H*%M*%S")}.txt")
+                initialfile = f"DG_LOG_{datetime.now().strftime('%Y-%m-%d@%H*%M*%S')}.txt")
             if file_path.endswith((".txt",".TXT")):
                 try:
                     # Open the file in write mode ('w')
                     with open(file_path, 'w') as file:
                         file.write(gdata.log_Get() + gdata.code_Get())
-                        #print(f"Successfully wrote the string to {file_path}")
                         gdata.log_It(f"Log saved to {file_path}")
                 except IOError as e:
                         print(f"An error occurred while writing to the file: {e}")
        
                 return
-
-                        
+                       
         def quit(self,*args):
             bmsg = "Save Log File?"
             if messagebox.askyesno("Warning:",bmsg):
@@ -904,37 +971,17 @@ if __name__ == "__main__":
                 self.saveLog()
             self.destroy()
             return 
-        
-        def getData(self,*args):
-           #self.dfDisplay()
-           #file_types = [("CSV Files", "*.csv"), ("Text Files", "*.txt"), ("All Files", "*.*")]
-            file_types = [("CSV Files", "*.csv"),("Excel Files", "*.xlsx"), ("Stata Files", "*.dta")]
-            file_path = filedialog.askopenfilename(filetypes=file_types, title="Select a File")
-            if file_path != '':
-                #cautious reading
-                try:
-                    df_temp= pd.read_csv(file_path, engine= 'python', header=None, nrows=1)
-                    inputheader =  df_temp.iloc[0].fillna(' ')
-                    headercols = len(inputheader)
-                    df_in = pd.read_csv(file_path, skiprows = 1, header=None) # header=0 is default
-                    inputrows = len(df_in)
-                    if len(df_in.columns) != headercols:
-                         # This case might happen if the header line had a different count from the first data line
-                         #print("Header column count does not match the first column count.")
-                         messagebox.showerror(title= '  ', message=f"Column label count ({headercols}) does not match the data column count {len(df_in.columns)}. Proceeding, not end well. Check data and try again.")
-                    else:
-                         df_in.columns = inputheader
-                         #print(f"Dataframe loaded successfully with {headercols} columns and ")
-                         messagebox.showerror(title= '  ', message=f"Dataframe loaded successfully with {headercols} columns and {inputrows} rows.")
-                except pd.errors.ParserError as e:
-                    print(f"Error reading CSV: {e}")
-                    messagebox.showerror(title = '  ',message=f"Error reading CSV: {e}" )
-                    # The error message will often indicate the problematic row number
-                #df_in = pd.read_csv(file_path)
-                self.fpath = file_path
-                #self.doReset(df_in)
-                gdata.reset_Data(file_path, df_in)
-            return
+
+        def getData(self, *args):
+            df = None
+            filepath = None
+            df, filepath = gdata.getData()
+            ##################################################################################
+            ############## Updata the global data structure
+            ##################################################################################
+            gdata.reset_Data(nupath=filepath, data_in=df)
+            gdata.log_It(f"pd.read_csv({filepath})")
+            return      
             
 
     app = solo()

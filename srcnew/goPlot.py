@@ -8,29 +8,25 @@ Created on Tue Sep  2 09:06:58 2025
 
 # from patsy import dmatrices, NAAction
 # from sklearn.metrics import roc_curve, auc
-import sys
 from datetime import datetime
 
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 import numpy as np
-import scipy
 from scipy.interpolate import griddata
 import statsmodels.api as sm
 
 import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext, ttk
+from tkinter import filedialog, messagebox, ttk
 
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from mpl_toolkits.mplot3d import Axes3D
 #from matplotlib.backends.backend_tkagg import (
 #    FigureCanvasTkAgg,  # interface between Figure class and Tkinter's Canvas
 #    NavigationToolbar2Tk  # built-in toolbar for the figure
 #)
 import seaborn as sb
-sb.set_style("darkgrid", {"grid.color": ".6", "grid.linestyle": ":"})
 
 
 
@@ -42,6 +38,11 @@ import Graphics as grp
 
 import globalData as gd
 from globalData import gdata
+
+sb.set_style("darkgrid", {"grid.color": ".6", "grid.linestyle": ":"})
+
+
+
 
 
 HAVELOESS2D = False
@@ -260,7 +261,6 @@ class goPlot(tk.Toplevel):
 
         # get the data from gdata
         self.syncData()
-
         return
 
     def exit_closing(self):
@@ -286,9 +286,10 @@ class goPlot(tk.Toplevel):
             defaultextension=".csv",
             filetypes=[('Text Files', '*.txt'),
                        ('All Files', '*.*'), ('CSV Files', '*.csv')],
-            initialfile = f"DG_PlotData_{datetime.now().strftime("%Y-%m-%d@%H-%M-%S")}.csv"
+            initialfile = f"DG_PlotData_{datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}.csv"
         )
-        if (len(self.current_data) == 0): return
+        if (len(self.current_data) == 0):
+            return
         self.current_data.to_csv(file_path)
         gdata.log_It(f"Plotting Data Saved to: {file_path}")
         gdata.code_It(f"#Plotting Data Saved to: {file_path}")
@@ -367,15 +368,15 @@ class goPlot(tk.Toplevel):
             if idx == 0:
                 item.mframe.grid_forget()
                 item.mframe2.grid_forget()
-            elif (idx == 1) & (self.plot_type in ['3D Scatter Plot', '3D Surface Plot']):
+            elif (idx == 1) and (self.plot_type in ['3D Scatter Plot', '3D Surface Plot']):
                 item.mframe.grid_forget()
                 item.mframe2.grid_forget()
-            elif (idx == 1) & (self.plot_type in ['2D Line/Scatter Plot']):
+            elif (idx == 1) and (self.plot_type in ['2D Line/Scatter Plot']):
                 item.mframe.grid(row=4, column=0, rowspan=3,
                                  columnspan=2, sticky='w')
                 item.mframe2.grid(row=7, column=0, rowspan=3,
                                   columnspan=2, sticky='w')
-            elif (idx >= 2) & (self.plot_type in ['3D Scatter Plot', '3D Surface Plot', '2D Line/Scatter Plot']):
+            elif (idx >= 2) and (self.plot_type in ['3D Scatter Plot', '3D Surface Plot', '2D Line/Scatter Plot']):
                 item.mframe.grid(row=4, column=0, rowspan=3,
                                  columnspan=2, sticky='w')
                 item.mframe2.grid(row=7, column=0, rowspan=3,
@@ -703,7 +704,7 @@ class gPlot(tk.Frame):
                     item.mframe2.grid(row=7, column=0, rowspan=3,
                                       columnspan=2, sticky='w')
                     if idx > 0:
-                        item._forget()
+                        item.grid_forget()
                     else:
                         item.mframe.grid_forget()
                         item.mframe2.grid_forget()
@@ -727,7 +728,8 @@ class gPlot(tk.Frame):
             if len(self.master.master.v1list) > 2: 
                 for idx, item in enumerate(self.master.master.v1list):
                     item.gxlnstyle['values'] = ['-'] + ['surface', 'wireframe', 'triangulated']
-                    if not HAVELOESS2D: item.gxlnest['values'] = smoothernl
+                    if not HAVELOESS2D:
+                        item.gxlnest['values'] = smoothernl
                     item.clickedGXlnstyle.set('-')
                     if idx < 2:
                         item.mframe.grid_forget()
@@ -1054,7 +1056,7 @@ class gPlot(tk.Frame):
             # get the marker choice and override mv
             ymarker = 'o'
             if ytemp != '-':
-                mv == None
+                mv = None
                 ymarker = markerdict[ytemp]
 
             # set the color choice for the scatter plot dots, either the plot-wide color choices
@@ -1065,16 +1067,16 @@ class gPlot(tk.Frame):
             palettev = None
             line_kw = {}
             huelist = []
-            if (cv == '-') & (ycolor != '-'):
+            if (cv == '-') and (ycolor != '-'):
                 huelist = None
                 palettev = None    
                 #line_kw={'color': ycolor}
-            elif(cv == '-') & (ycolor == '-'):
+            elif (cv == '-') and (ycolor == '-'):
                 huelist = None
                 palettev = None
                 ycolor = 'black'
                 line_kw = {'color': 'black'}
-            elif (cv != '-') & (ycolor != '-'):
+            elif (cv != '-') and (ycolor != '-'):
                 huelist = None
                 palettev = None
                 line_kw = {"color": ycolor}
@@ -1100,7 +1102,7 @@ class gPlot(tk.Frame):
             vloess = False
 
             if vystyl != '-':
-                if ltemp == None:
+                if ltemp is None:
                     showline = True
                 elif ltemp == 'median':
                     showline = True
@@ -1148,9 +1150,9 @@ class gPlot(tk.Frame):
                                "color": ycolor, "s": ysize, "marker": ymarker}
 
             lineplotdict = {"x": xv, "y": yv, "color": lcolor, "linewidth": ysize/5, "label": yv,
-                            "markers": False, "estimator": ltemp, "errorbar": None, "linestyle": vystyl}
+                            "markers": False, "estimator": ltemp, "errorbar" : None, "linestyle": vystyl}
 
-            regplotdict = {"x": xv, "y": yv, "label": yv, "scatter": False, "label": yv,
+            regplotdict = {"x": xv, "y": yv, "label": yv, "scatter": False,
                            "lowess": vloess, "order": polyorder, "ci":  vci, "line_kws": line_kw}
 
             # print(f"Showline: {showline}, showsmooth {showsmooth}, showscatter = {showscatter}")
@@ -1163,7 +1165,7 @@ class gPlot(tk.Frame):
             if (showscatter):
                 # print("scatterplot params: ***>\n =======\n",", ".join([str(k)+" = "+str(scatterplotdict[k]) for k in list(scatterplotdict.keys())]))
                 #lstr = "sb.scatterplot(df, ax = ax, " + ", ".join([str(k)+" = "+f"'{scatterplotdict[k]}'" for k in list(scatterplotdict.keys())])+")"
-                lstr = "sb.scatterplot(df, ax = ax, **" +f"{scatterplotdict})"
+                lstr = "sb.scatterplot(df, ax = ax, **" + f"{scatterplotdict}" + ")"
                 gdata.code_It(lstr)
                 sb.scatterplot(df, ax = ax, **scatterplotdict)
                 #gd.sb_scatterplotJM(df, **scatterplotdict)
@@ -1203,7 +1205,7 @@ class gPlot(tk.Frame):
             bdu = float(item.gxub.get())
             # if we are graphing anything about this variable, include its data range in the ylim calculations
             # ylower and yupper are initialized to yupper=ylower=0 at before this loop
-            if (showscatter | showsmooth | showline):
+            if showscatter or showsmooth or showline:
                 if (yupper == ylower):
                     ylower = bdl
                     yupper = bdu
@@ -1252,7 +1254,8 @@ class gPlot(tk.Frame):
         # find the object for the "y" variable
         ytemp = vy.clickedGXmkr.get()
         dolines = False
-        if self.gridplottype.get() == "Lines": dolines = True
+        if self.gridplottype.get() == "Lines":
+            dolines = True
             
         doreg = self.regline.get()
         
@@ -1298,7 +1301,6 @@ class gPlot(tk.Frame):
         gdata.code_It(lstr3)
         #gdata.code_It(lstr4)
 
-
                 
 
         # set the color palette for automatic coloring
@@ -1321,8 +1323,7 @@ class gPlot(tk.Frame):
             ptitle = user_title + "\n" + ptitle
             ctitle = user_title + " \\n " + ctitle
 
-        lg_msg = f" 2D Scatter Plot Grid: y= {yv}, x= {xv}, color= {
-            cv}, marker= {mv}, rows= {rf}, cols= {cf}, Title: {ptitle}"
+        lg_msg = f" 2D Scatter Plot Grid: y= {yv}, x= {xv}, color= {cv}, marker= {mv}, rows= {rf}, cols= {cf}, Title: {ptitle}"
         gdata.log_It(lg_msg)
 
 
@@ -1341,6 +1342,7 @@ class gPlot(tk.Frame):
                 if dolines:
                     plotdict['kind'] = 'line'
                     plotdict['lw'] = ysize
+                    plotdict['errorbar'] = None
                 else:
                     plotdict["s"] = ysize
         else:
@@ -1350,6 +1352,7 @@ class gPlot(tk.Frame):
                 if dolines:
                     plotdict['color'] = ycolor
                     plotdict['lw'] = ysize
+                    plotdict['errorbar']=None
                 else:
                     plotdict['color'] = ycolor
                     plotdict['s'] = ysize
@@ -1357,6 +1360,7 @@ class gPlot(tk.Frame):
             plotdict['row'] = rf
         if (cf != '-'): 
             plotdict['col'] = cf
+
             
         if doreg == 'Yes':
             #lstr = "g = sb.lmplot(" + ", ".join([str(k)+" = "+str(plotdict[k]) for k in list(plotdict.keys())])+")"
@@ -1467,7 +1471,7 @@ color_variable = False"""
 
         if cv != '-':
             colorD, colorlist, cvpatches = grp.getcolor(cv, list(df[cv]))
-            gdata.code_It(f"colorD, colorlist, cvpatches = grp.getcolor(cv, list(df[cv]))")
+            gdata.code_It("colorD, colorlist, cvpatches = grp.getcolor(cv, list(df[cv]))")
 
         # initialize the z axis label
         zlab = ''
@@ -1549,7 +1553,7 @@ color_variable = False"""
                     nupatch = mpatches.Patch(color=colorchoice, label=zlegend)
                     lpatches.extend([nupatch])
                     gdata.code_It(f"nupatch = mpatches.Patch(color='{colorchoice}', label='{zlegend}')")
-                    gdata.code_It(f"lpatches.extend([nupatch])")
+                    gdata.code_It("lpatches.extend([nupatch])")
 
                 # Do the scatter plot
                 if colorlistz is not None:
@@ -1783,7 +1787,7 @@ z = Zi"""
                 gdata.code_It(f"triangulatedplotparms = {{'color': '{zcolor}', 'label': '{zv}', 'edgecolor': 'lightgrey', 'alpha': 0.5}}")
                 try:
                     zsurf = ax.plot_trisurf(x, y, z, **triangulatedplotparms)
-                    gdata.code_It(f"zsurf = ax.plot_trisurf(x, y, z, **triangulatedplotparms)")
+                    gdata.code_It("zsurf = ax.plot_trisurf(x, y, z, **triangulatedplotparms)")
                 except Exception as er:
                     gdata.log_It(f" plot_trisurf() failed! Error:{er}")
                     tk.messagebox.showerror(
@@ -1793,13 +1797,13 @@ z = Zi"""
                 wireframeplotparms = {'color': 'lightgrey', 'label': zv, 'edgecolor': zcolor, 'alpha': 0.5}
                 gdata.code_It(f"wireframeplotparms = {{'color': '{'lightgrey'}', 'label': '{zv}', 'edgecolor': '{zcolor}', 'alpha': 0.5}}")  
                 zsurf = ax.plot_wireframe(x, y, z, **wireframeplotparms)
-                gdata.code_It(f"zsurf = ax.plot_wireframe(x, y, z, **wireframeplotparms)")
+                gdata.code_It("zsurf = ax.plot_wireframe(x, y, z, **wireframeplotparms)")
                 # ax.plot_wireframe(x, y, z, color = 'lightgrey', label = zv, edgecolor = zcolor, alpha = 0.5)
             elif zstyl == 'surface':
                 surfaceplotparms = {'color': zcolor, 'label': zv, 'edgecolor': 'lightgrey', 'alpha': 0.5}
                 gdata.code_It(f"surfaceplotparms = {{'color': '{zcolor}', 'label': '{zv}', 'edgecolor': 'lightgrey', 'alpha': 0.5}}")
                 zsurf = ax.plot_surface(x, y, z, **surfaceplotparms)
-                gdata.code_It(f"zsurf = ax.plot_surface(x, y, z, **surfaceplotparms)")
+                gdata.code_It("zsurf = ax.plot_surface(x, y, z, **surfaceplotparms)")
     
                 # ax.plot_surface(x, y, z, color = zcolor, label = zv, edgecolor = 'lightgrey', alpha = 0.5)
             if zsurf is not None:
@@ -1923,8 +1927,10 @@ ax.set_zlim({zlower}, {zupper})"""
         gdata.log_It(lg_msg)
         
         palettev = 'bright'
-        if (rf == '-'): rf = None
-        if (cf == '-'): cf = None
+        if (rf == '-'):
+            rf = None
+        if (cf == '-'):
+            cf = None
         if (cv == '-'):
             cv = None
             palettev = None
@@ -2014,8 +2020,7 @@ ax.set_zlim({zlower}, {zupper})"""
             ptitle = user_title + "\n" + ptitle
             ctitle = user_title + " \\n " + ctitle 
 
-        lg_msg = f" #1 Box Plot x= {cv}, y= {xv}, color= {
-            cv}, gv = {gv}, rows= {rf}, cols= {cf}"
+        lg_msg = f" #1 Box Plot x= {cv}, y= {xv}, color= {cv}, gv = {gv}, rows= {rf}, cols= {cf}"
         # print(lg_msg)
         gdata.log_It(lg_msg)
 
@@ -2036,13 +2041,12 @@ ax.set_zlim({zlower}, {zupper})"""
         if gv != '-':
             gvp = gv
         # if cv is set but gv is not, set gv = cv
-        if (cv != '-') & (gv == '-'):
+        if (cv != '-') and (gv == '-'):
             gvp = cv
             gv = cv
 
-        if (gv != '-') & (cv != '-') & (gv != cv) & (ditherparm == 'Yes'):
-            dmsg = f"color = {cv};  grouping = {
-                gv}.  When color and grouping \nvariables don't match dithering is unpredictable. \nContinue?"
+        if (gv != '-') and (cv != '-') and (gv != cv) and (ditherparm == 'Yes'):
+            dmsg = f"color = {cv};  grouping = {gv}.  When color and grouping \nvariables don't match dithering is unpredictable. \nContinue?"
             dithercheck = messagebox.askyesno("Dither Issue", dmsg)
             if (not dithercheck):
                 return
@@ -2052,8 +2056,7 @@ ax.set_zlim({zlower}, {zupper})"""
         else:
             fliersp = True
 
-        lg_msg = f"Box Plot  x= {gvp}, y= {yvp}, hue= {cvp}, rows= {rfp}, cols= {
-            cfp}, palette= {palettep}, | gv = {gv}, dither = {ditherparm}"
+        lg_msg = f"Box Plot  x= {gvp}, y= {yvp}, hue= {cvp}, rows= {rfp}, cols= {cfp}, palette= {palettep}, | gv = {gv}, dither = {ditherparm}"
         gdata.log_It(lg_msg)
         # now do the plotting
         boxparms = {'x':gvp, 'y':yvp, 'hue':cvp, 'row':rfp, 'col':cfp, 'palette': palettep, 'kind':'box', 'legend':'full', 'showfliers': fliersp }
@@ -2157,8 +2160,10 @@ ax.set_zlim({zlower}, {zupper})"""
             ctitle = user_title + " \\n " + ctitle
         
         palettev = 'bright'
-        if rf == '-': rf = None
-        if cf == '-': cf = None
+        if rf == '-':
+            rf = None
+        if cf == '-':
+            cf = None
         if cv == '-': 
             cv = None
             palettev= None

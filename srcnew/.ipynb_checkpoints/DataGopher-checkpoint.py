@@ -27,6 +27,7 @@ from globalData import gdata
 
 from datetime import datetime
 
+from pandas.api.types import is_numeric_dtype
 import re
      
 # def nuNames(namelist = None):
@@ -241,10 +242,11 @@ class goStat(tk.Tk):
                 messagebox.showwarning("Warning","The selected file is empty or could not be read.")
                 return
             ### Check for machine infinite values (+/- np.inf)
-            suminf = sum([sum(df[item].isin([-np.inf,+np.inf])) for item in df.columns])
-            listinf = [item for item in df.columns if sum(df[item].isin([-np.inf, +np.inf])) >0]
+            infbool = [sum(np.isinf(df[item])) for item in df.columns if is_numeric_dtype(df[item])]
+            suminf = sum(infbool)
+            listinf = [df.columns[idx]  for idx, item in enumerate(infbool) if infbool[idx] > 0] #for item in df.columns if sum(np.isinf(df[item])) >0]
             if suminf > 0:
-                emsg = f"Data file contains {suminf} infinite values in columns: {",".join(listinf)}\n Convert to NA? (Yes = convert, No = do not convert)"
+                emsg = f"Data file contains {suminf} infinite values in columns: {", ".join(listinf)}\n Convert to NA? (Yes = convert, No = do not convert)"
                 gdata.log_It(emsg)
                 ynbool = messagebox.askyesno(" ",emsg)
                 if ynbool:

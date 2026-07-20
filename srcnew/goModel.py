@@ -9,28 +9,21 @@ Created on Wed Aug 27 21:49:03 2025
 from patsy import dmatrices, NAAction
 from sklearn.metrics import roc_curve, auc
 from datetime import datetime
-import statsmodels.api  as sm
-import statsmodels.formula.api as smf
-from statsmodels.graphics.regressionplots import plot_partregress_grid, plot_leverage_resid2, influence_plot, plot_fit
 
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
 import Regression as rg
-from Regression import imdl  #provides model data shared between goModel.py and Regression.py only.
+
 import Graphics as grp
-
-
-
+from statsmodels.graphics.regressionplots import influence_plot, plot_leverage_resid2
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 
-import numpy as np
 
 # from matplotlib.backends.backend_tkagg import (
 #     FigureCanvasTkAgg, # interface between Figure class and Tkinter's Canvas
@@ -39,10 +32,6 @@ import numpy as np
 
 import seaborn as sb
 #sb.set_style("darkgrid", {"grid.color": ".6", "grid.linestyle": ":"})
-
-from mpl_toolkits.mplot3d import Axes3D
-
-import sys
 
 #import globalData as gd
 #import goDataFilter as godf
@@ -53,11 +42,11 @@ from globalData import gdata
 """
 Notes:
     
-    imdl.fitdata is not None signals model is current, and fit succesfully -- whether appropriate to the data or not.
-    imdl.fitdata is None signals model has been edited and not re-fitted, model fit failed, or any other event that might
+    gdata.fitdata is not None signals model is current, and fit succesfully -- whether appropriate to the data or not.
+    gdata.fitdata is None signals model has been edited and not re-fitted, model fit failed, or any other event that might
         put model plotting out of sync with the intended model.   In particuar changeIndVar, changeDepVar and clearModel all 
-        trigger imdl.fitdata being reset to None.  Anything that needs a fitted model consistent with the model displayed
-        needs to have imdl.fitdata is not None.
+        trigger gdata.fitdata being reset to None.  Anything that needs a fitted model consistent with the model displayed
+        needs to have gdata.fitdata is not None.
 """
         
 # basecolors0 = ['red',  'blue', 'green', 'goldenrod', 'violet','cyan', 
@@ -119,10 +108,10 @@ class RegressionApp(tk.Toplevel):
         self.geometry('%dx%d+%d+%d' % (1180, 550, 0, 0))
         self.protocol("WM_DELETE_WINDOW", self.exit_closing)
 
-        imdl.inputdata = pd.DataFrame()
-        imdl.model_vars = ['-']
-        imdl.fname = 'None'
-        imdl.model_string = '~'
+        gdata.inputdata = pd.DataFrame()
+        gdata.model_vars = ['-']
+        gdata.fname = 'None'
+        gdata.model_string = '~'
 
         
         #model stack
@@ -130,7 +119,7 @@ class RegressionApp(tk.Toplevel):
         
         # Variables
         self.datafilename = tk.StringVar(self)
-        self.datafilename.set(imdl.fname)
+        self.datafilename.set(gdata.fname)
         self.ModelStr = tk.StringVar(self)
         self.clickedX = tk.StringVar(self)
         self.clickedY = tk.StringVar(self)
@@ -141,7 +130,7 @@ class RegressionApp(tk.Toplevel):
         self.Pr = tk.IntVar(self)
         self.Rs = tk.IntVar(self)
         self.selected_model = tk.StringVar(self, mtypes[0])
-        self.nbparm_alpha = tk.StringVar(self, str(1.0))
+        self.nbparm_alpha = tk.StringVar(self, '')
         self.siglev = tk.StringVar(self, str(0.05))
         self.gbins = tk.StringVar(self)
         self.xlb = tk.StringVar(self)
@@ -183,12 +172,12 @@ class RegressionApp(tk.Toplevel):
 
         RRow = 2
         tk.Label(self.mf1, text="Dependent Variable:").grid(row=RRow, column=0, sticky='w', padx=10)
-        numeric_columns = [item for item in imdl.inputdata.columns if is_numeric_dtype(imdl.inputdata[item])]
+        numeric_columns = [item for item in gdata.inputdata.columns if is_numeric_dtype(gdata.inputdata[item])]
         self.cy = ttk.Combobox(self.mf1, values=numeric_columns, textvariable=self.clickedY)
         self.cy.grid(row=RRow, column=1, sticky='w')
         self.cy.bind("<<ComboboxSelected>>", self.changeDepVar)
         tk.Label(self.mf1, text="Independent Variables:").grid(row=RRow, column=2, sticky='e')
-        self.cx = ttk.Combobox(self.mf1, values=imdl.model_vars, textvariable=self.clickedX)
+        self.cx = ttk.Combobox(self.mf1, values=gdata.model_vars, textvariable=self.clickedX)
         self.cx.grid(row=RRow, column=3, sticky='w')
         #self.cx.grid(row=RRow, column=0, sticky='w')
         self.cx.bind("<<ComboboxSelected>>", self.changeIndepVar)
@@ -217,7 +206,7 @@ class RegressionApp(tk.Toplevel):
         #over_disp_ent.grid(row=RRow, column=7, sticky='w')
         self.over_disp_ent.grid_forget()
         
-        self.over_dispParmLabel = tk.Label(self.mf2, text="(0.1-2.0)")
+        self.over_dispParmLabel = tk.Label(self.mf2, text="(>=0, no entry triggers estimation of o.d. param)")
         #over_dispParmLabel.grid(row=RRow, column=8, sticky='w')
         self.over_dispParmLabel.grid_forget()
         
@@ -241,20 +230,21 @@ class RegressionApp(tk.Toplevel):
         self.buttonSaveDes = tk.Button(self.mf2, text="Save Model Fit Output", command=self.saveDes)
         self.buttonSaveDes.grid(row=RRow, column=4, columnspan = 2)
         tk.Button(self.mf2, text="Save Model Input Data Only", command=self.saveDmatOnly).grid(row=RRow, column=6)
+        tk.Button(self.mf2, text="Forecast using the model.", command = self.forecast).grid(row = RRow, column = 7)
 
         # Frame 3
-        self.mf3 = tk.Frame(self, borderwidth=1, relief="solid", highlightthickness=0, padx=10, pady=10)
-        self.mf3.pack(fill='x', side=tk.TOP, padx=10, pady=5)
+        self.mf3 = tk.Frame(self, borderwidth=2, relief="ridge", highlightthickness=0)
+        self.mf3.pack(fill='x', padx=10, pady=5, expand=False)
         RRow = 0
-        msg = '                                                                       '
+        msg = '                                                                               '
         msg1 = msg + msg + msg + msg
-        tk.Label(self.mf3, text=msg1, fg="white").grid(row=RRow, column=0, columnspan=11, sticky='w', padx=10)
+        tk.Label(self.mf3, text=msg1, fg="white").grid(row=RRow, column=0, columnspan=10, sticky='w', padx=10)
         tk.Label(self.mf3, text='Graphics: ', bg="blue", fg="white").grid(row=RRow, column=0, sticky='w', padx=10)
         tk.Label(self.mf3, text=" Mark Data with:").grid(row=RRow, column=1, sticky='w')
         self.gc = tk.OptionMenu(self.mf3, self.clickedGC, ['-'], command=self.makePlotc)
         self.gc.grid(row=RRow, column=2, sticky='w')
         tk.Label(self.mf3, text='Pen Size:').grid(row=RRow, column=3, sticky='w')
-        self.gpen = tk.Scale(self.mf3, from_=0.25, to=100, orient='horizontal', showvalue=True)
+        self.gpen = tk.Scale(self.mf3, from_=1.0, to=50.0, orient='horizontal', showvalue=True)
         self.gpen.grid(row=RRow, column=4)
         self.gpen.set(5)
 
@@ -264,9 +254,10 @@ class RegressionApp(tk.Toplevel):
         self.grp2d = tk.Frame(self.grp0, borderwidth=1, relief=tk.RIDGE)
         self.grp3d = tk.Frame(self.grp0, borderwidth=1, relief=tk.RIDGE)
         self.grp3d.pack(side=tk.LEFT, fill='x', padx=20, anchor='w', expand=True)
+        
         tk.Label(self.grp2d, text=' 2 & 3 dimension model plots').grid(row=0, column=0, sticky='w')
         tk.Button(self.grp2d, text="Model Plot", command=self.modelplot).grid(row=1, column=0)
-        tk.Checkbutton(self.grp2d, text="Resp.", variable=self.selected_response, onvalue=1, offvalue=0, height=3, width=5).grid(row=1, column=1, padx=5)
+        #tk.Checkbutton(self.grp2d, text="Resp.", variable=self.selected_response, onvalue=1, offvalue=0, height=3, width=5).grid(row=1, column=1, padx=5)
         tk.Checkbutton(self.grp2d, text="CI", variable=self.selected_ci, onvalue=1, offvalue=0, height=3, width=3).grid(row=1, column=2, padx=5)
         self.pint = tk.Checkbutton(self.grp2d, text="PI", variable=self.selected_pi, onvalue=1, offvalue=0, height=3, width=3)
         #self.pint.grid(row=1, column=3, padx=10)
@@ -296,9 +287,15 @@ class RegressionApp(tk.Toplevel):
         self.plothint = tk.Label(self.grp3d, text="To refresh plot, re-choose variable").grid(row = 6, column =1)
         self.mf3.pack_forget()
 
+      # Frame 4
+        RRow = 0
+        self.mf4 = tk.Frame(self, borderwidth=1, relief="ridge", highlightthickness=0, padx=10, pady=5)
+        tk.Label(self.mf4, text = "Forecast:", bg="blue", fg="white").grid(row=RRow, column=0, sticky='w', padx=10)
+
         # Toplevel windows
         self.repwin = tk.Toplevel(self)
         self.repwin.title("Report Viewer \n(most recent at top)")
+        self.repwin.geometry("800x300")
         self.repwin.wm_protocol("WM_DELETE_WINDOW", self.hideRep)
         self.text_area = scrolledtext.ScrolledText(self.repwin, wrap=tk.WORD, width=100, height=40)
         self.text_area.pack(padx=10, pady=5)
@@ -315,12 +312,11 @@ class RegressionApp(tk.Toplevel):
     # Example for getData, updateData, etc. You need to refactor all functions to methods and update references accordingly.
     
     def setLink(self,*args):
-        imdl.link = self.clickedLink.get()
+        gdata.link = self.clickedLink.get()
         return
     
     def model_choice(self, *args):
         mdl = self.selected_model.get()
-        #print(f"Model chosen: {mdl}")
         RRow = 1
         if mdl == 'NEGATIVE BINOMIAL':
             self.over_dispLabel.grid(row=RRow, column=6, sticky='e')
@@ -368,13 +364,13 @@ class RegressionApp(tk.Toplevel):
     def syncData(self, *args):
         if (len(gdata.data)>0):
             filename = gdata.fpath
-            imdl.inputdata = gdata.data.copy(deep = True)
-            imdl.fname = gdata.fpath
-            imdl.model_vars = ['-'] + list(imdl.inputdata.columns)
-            imdl.fitdata = None
-            imdl.model_string = '~'
-            self.cy['values'] = imdl.model_vars
-            self.cx['values'] = imdl.model_vars
+            gdata.inputdata = gdata.data.copy(deep = True)
+            gdata.fname = gdata.fpath
+            gdata.model_vars = ['-'] + list(gdata.inputdata.columns)
+            gdata.fitdata = None
+            gdata.model_string = '~'
+            self.cy['values'] = gdata.model_vars
+            self.cx['values'] = gdata.model_vars
             self.datafilename.set(filename)
             self.text_area.delete("1.0",tk.END)
             self.clearModel()
@@ -382,7 +378,12 @@ class RegressionApp(tk.Toplevel):
         else:
             return
         return
-    
+    def forecast(self, *args):
+        #open the forecast window
+        #self.mf4.pack(side=tk.TOP) 
+        self.mf4.pack(fill='x', padx=10, pady=5, expand=False)            
+
+        return
     # def updateData(self, *args):
     #     gdata.data = pd.DataFrame()
     #     gdata.fpath = ''
@@ -391,122 +392,134 @@ class RegressionApp(tk.Toplevel):
     
     def saveModel(self, *args):
         self.mstk.model_string_stack.append(self.meqn.get())
-        self.mstk.ivar_stack.append(imdl.indvars)
-        self.mstk.dvar_stack.append(imdl.depvar)
+        self.mstk.ivar_stack.append(gdata.indvars)
+        self.mstk.dvar_stack.append(gdata.depvar)
         return
     
     def pullModel(self, *args):
-        if len(self.mstk.model_string_stack) == 0 : return
+        if len(self.mstk.model_string_stack) == 0 :
+            return
         if self.mstk.stack_level <= -len(self.mstk.model_string_stack):
             self.mstk.stack_level = -1 #we're at the end reset the stack level
         else:
             self.mstk.stack_level -= 1 #decrement stack level
         mstring = self.mstk.model_string_stack[self.mstk.stack_level]
         self.meqn.set(mstring)
-        imdl.model_string = mstring
-        imdl.indvars = self.mstk.ivar_stack[self.mstk.stack_level]
-        imdl.depvar = self.mstk.dvar_stack[self.mstk.stack_level]
+        gdata.model_string = mstring
+        gdata.indvars = self.mstk.ivar_stack[self.mstk.stack_level]
+        gdata.depvar = self.mstk.dvar_stack[self.mstk.stack_level]
         return
     
     def changeIndepVar(self, *args):
         xstr = str(self.clickedX.get())
         if xstr == "-":
             return
-        elif imdl.depvar == xstr:
+        elif gdata.depvar == xstr:
             messagebox.showerror(' ', f"The variable {xstr} is also the dependent variable.  \n This model is self-explanatory. \nYou're making this too easy!")
             return
         else:
-            if xstr not in imdl.indvars:
-                if len(imdl.indvars) == 0:
-                    imdl.model_string += xstr
+            if xstr not in gdata.indvars:
+                if len(gdata.indvars) == 0:
+                    gdata.model_string += xstr
                 else:
-                    imdl.model_string += '+' + xstr
-                imdl.indvars.add(xstr)
-        self.meqn.set(imdl.model_string)
+                    gdata.model_string += '+' + xstr
+                gdata.indvars.add(xstr)
+        self.meqn.set(gdata.model_string)
         c0 = set()
-        current_varset = c0.union(imdl.indvars, set([imdl.depvar]))
-        remaining_varlist = ['-'] + [item for item in list(imdl.inputdata.columns) if item not in current_varset]
+        current_varset = c0.union(gdata.indvars, set([gdata.depvar]))
+        remaining_varlist = ['-'] + [item for item in list(gdata.inputdata.columns) if item not in current_varset]
         self.cx['values'] = remaining_varlist
         
         #complexity: dependent variable must be a number
-        numeric_columns = [item for item in imdl.inputdata.columns if is_numeric_dtype(imdl.inputdata[item])]
+        numeric_columns = [item for item in gdata.inputdata.columns if is_numeric_dtype(gdata.inputdata[item])]
         remaining_varlist = ['-'] + [item for item in numeric_columns if item not in current_varset]
         self.cy['values'] = remaining_varlist
          
-        imdl.fitdata = None
+        gdata.fitdata = None
         return
     
     def changeDepVar(self, *args):
         ystr = str(self.clickedY.get())
-        if ystr == imdl.depvar:
+        if ystr == gdata.depvar:
             return
         elif ystr == "-":
             return
         else:
-            imdl.depvar = ystr
-            if len(imdl.model_string.split("~")) < 2:
-                imdl.model_string = ystr + '~'
+            gdata.depvar = ystr
+            if len(gdata.model_string.split("~")) < 2:
+                gdata.model_string = ystr + '~'
             else:
-                imdl.model_string = ystr + '~' + imdl.model_string.split("~")[1]
+                gdata.model_string = ystr + '~' + gdata.model_string.split("~")[1]
             
-        self.meqn.set(imdl.model_string)
+        self.meqn.set(gdata.model_string)
         c0 = set([''])
-        current_varset = c0.union(imdl.indvars, set([imdl.depvar]))
-        remaining_varlist = ['-'] + [item for item in imdl.inputdata.columns if item not in current_varset]
+        current_varset = c0.union(gdata.indvars, set([gdata.depvar]))
+        remaining_varlist = ['-'] + [item for item in gdata.inputdata.columns if item not in current_varset]
         self.cx['values'] = remaining_varlist
         
         #complexity: dependent variable must be a number
-        numeric_columns = [item for item in imdl.inputdata.columns if is_numeric_dtype(imdl.inputdata[item])]
+        numeric_columns = [item for item in gdata.inputdata.columns if is_numeric_dtype(gdata.inputdata[item])]
         remaining_varlist = ['-'] + [item for item in numeric_columns if item not in current_varset]
         self.cy['values'] = remaining_varlist
         
-        imdl.fitdata = None
+        gdata.fitdata = None
         return
     
     def clearModel(self):
-        imdl.depvar = ""
-        imdl.indvars = set([])
-        imdl.model_string = '~'
-        self.meqn.set(imdl.model_string)
-        self.clickedY.set(imdl.model_vars[0])
-        self.clickedX.set(imdl.model_vars[0])
-        imdl.fitdata = None
-        if (self.buttonSaveDes.winfo_ismapped()): self.buttonSaveDes.grid_forget()
-        self.cx['values'] = list(imdl.inputdata.columns)
-        numeric_columns = [item for item in imdl.inputdata.columns if is_numeric_dtype(imdl.inputdata[item])]
+        gdata.depvar = ""
+        gdata.indvars = set([])
+        gdata.model_string = '~'
+        self.meqn.set(gdata.model_string)
+        self.clickedY.set(gdata.model_vars[0])
+        self.clickedX.set(gdata.model_vars[0])
+        gdata.fitdata = None
+        if (self.buttonSaveDes.winfo_ismapped()):
+            self.buttonSaveDes.grid_forget()
+        self.cx['values'] = list(gdata.inputdata.columns)
+        numeric_columns = [item for item in gdata.inputdata.columns if is_numeric_dtype(gdata.inputdata[item])]
         self.cy['values'] = list(numeric_columns)
         return
     
     def runModel(self, *args):
-        imdl.model_type = str(self.selected_model.get())
-        imdl.link = str(self.link.get())
-        imdl.sig_level = 0.05
+        gdata.model_type = str(self.selected_model.get())
+        gdata.link = str(self.link.get())
+        gdata.sig_level = 0.05
         temp = self.siglev.get()
-        gdata.code_It(f"depvar = '{imdl.depvar}'")
-        gdata.code_It(f"indvars = {list(imdl.indvars)}")
+        gdata.code_It(f"depvar = '{gdata.depvar}'")
+        gdata.code_It(f"indvars = {list(gdata.indvars)}")
         try:
-            imdl.sig_level = float(temp)
-        except:
+            gdata.sig_level = float(temp)
+        except Exception as er:
+            messagebox.showwarning("nh", f"{er}: Significance level must be a number between 0 and 1. \n you entered :{temp}\n Defaulting to 0.05")
+            gdata.sig_level = 0.05
+        if gdata.sig_level <= 0 or gdata.sig_level >= 1:
             messagebox.showwarning("nh", f"Significance level must be a number between 0 and 1. \n you entered :{temp}\n Defaulting to 0.05")
-            imdl.siglev = 0.05
-        if imdl.sig_level <= 0 or imdl.sig_level >= 1:
-            messagebox.showwarning("nh", f"Significance level must be a number between 0 and 1. \n you entered :{temp}\n Defaulting to 0.05")
-            imdl.sig_level = 0.05
-        imdl.model_string = str(self.meqn.get())
-        mdlist = imdl.model_string.split("~")
-        if len(mdlist) < 2: 
-            messagebox.showwarning("nh", f"Incomplete Model specification: {imdl.model_string}. You need a dependent and one or more independent variables. \nTry again!")
+            gdata.sig_level = 0.05
+        gdata.model_string = str(self.meqn.get())
+        mdlist = gdata.model_string.split("~")
+        if (mdlist[0] == '') or (mdlist[1] == ''): 
+            messagebox.showwarning("nh", f"Incomplete Model specification: {gdata.model_string}. You need a dependent and one or more independent variables. \nTry again!")
             return
-        if imdl.model_type == 'NEGATIVE BINOMIAL':
-            temp = float(self.nbparm_alpha.get())
-            if temp < 0: temp = 0
-            if temp > 2.0: temp = 2.0
-            imdl.overdispersionparm = temp
-        imdl.fitdata = None
+        #tempods: temporary overdispersion: holder for the tkinter input string (Negative Binomial only)
+        tempods = ''
+        #default overdispersion parameter 
+        tempod = 1.0
+        if gdata.model_type == 'NEGATIVE BINOMIAL':
+            tempods = self.nbparm_alpha.get()
+            if tempods == '':
+                tempod = -1
+            else:
+                tempod = float(self.nbparm_alpha.get())
+            if tempod < 0:
+                tempod = -1
+            #if tempod > 2.0:
+                #tempod = 2.0
+            gdata.overdispersion = tempod
+        gdata.fitdata = None
 ####################################################################
 ########### Run the model
         gdata.log_It("\n:Model:\n")
-        gdata.log_It(f"Fitting the model: {imdl.model_string} type = {imdl.model_type}")
+        gdata.log_It(f"Fitting the model: {gdata.model_string} type = {gdata.model_type}")
         rtemp = rg.goModel()
 ####################################################################
         mdl_res, res = rtemp #retrieve fitting data and results 
@@ -521,47 +534,50 @@ class RegressionApp(tk.Toplevel):
             #update the report window aka text_area
             repstr = ''
 
-            yhat = res.fittedvalues
-            repstr = grp.do_Report(res = res, model_string = imdl.model_string, alpha = imdl.sig_level, model_type = imdl.model_type)
+            #yhat = res.fittedvalues
+            repstr = grp.do_Report(res = res, model_string = gdata.model_string, alpha = gdata.sig_level, model_type = gdata.model_type)
           
             self.text_area.insert('1.0', '\n' + repstr)
             gdata.log_It('\n'+str(repstr))
-            gdata.code_It(f"print(grp.do_Report(res = res, model_string = '{imdl.model_string}', alpha = {imdl.sig_level}, model_type = '{imdl.model_type}'))")
+            gdata.code_It(f"print(grp.do_Report(res = res, model_string = '{gdata.model_string}', alpha = {gdata.sig_level}, model_type = '{gdata.model_type}'))")
             #self.log_area.insert(tk.END, rlog)
             gphv = list(mdl_res.columns)
             #gphvars = [item for item in gphv if len(mdl_res[item].unique()) <= len(basecolors0)]
             gphvars = gphv
             gphvars.insert(0, "-")
-            nuvars = list(mdl_res.columns)
+            #nuvars = list(mdl_res.columns)
             mdlvars = list(res.params.index)
             #print(f"mdlvars: {', '.join(mdlvars)} \n nuvars: {', '.join(nuvars)}")
-            imdl.modelres = res
-            imdl.fitdata = mdl_res.copy(deep = True)
+            gdata.modelres = res
+            gdata.fitdata = mdl_res.copy(deep = True)
 
             #gdata.put_Data(mdl_res.copy(deep = True))
             
             #adjust the grahics choices based on the model type    
             self.update_option_menu_colors(gphvars)
             self.update_option_menu_vars(mdlvars + ['Predictions'])
-            if (not self.buttonSaveDes.winfo_ismapped()): self.buttonSaveDes.grid(row = 2, column = 10)
+            if (not self.buttonSaveDes.winfo_ismapped()):
+                self.buttonSaveDes.grid(row = 2, column = 10)
             self.mf3.pack()
-            if imdl.model_type in ['LOGIT','PROBIT']:
+            if gdata.model_type in ['LOGIT','PROBIT']:
                 self.rocbutton.grid(row = 1, column=0)
             else:
                 self.rocbutton.grid_forget()
-            if imdl.model_type in ['OLS']:
+            if gdata.model_type in ['OLS']:
                 self.influencebutton.grid(row = 2, column = 2)
                 self.pint.grid(row=1, column=3, padx=10)
             else:
                 self.influencebutton.grid_forget()
                 self.pint.grid_forget()
-            if (len(imdl.indvars)<=2):
-                if not (self.grp2d.winfo_ismapped()): self.grp2d.pack()
-            if (len(imdl.indvars)>2):
-                if (self.grp2d.winfo_ismapped()): self.grp2d.pack_forget()
+            if (len(gdata.indvars)<=2):
+                if not (self.grp2d.winfo_ismapped()):
+                    self.grp2d.pack()
+            if (len(gdata.indvars)>2):
+                if (self.grp2d.winfo_ismapped()):
+                    self.grp2d.pack_forget()
                 
             #add model graphics to generated code
-            gdata.code_It('#### Model Graphics Options (comment or uncomment as needed)####')              
+            gdata.code_It('#### Model Graphics Options (comment or uncomment as needed)####') 
         else:
             # emsg = "Model Fit Failed.  Check the log file,"
             # emsg += "\nmodel formula, model type, data."
@@ -569,8 +585,9 @@ class RegressionApp(tk.Toplevel):
             # emsg += "\nRename non-conforming variable names or enclose in Q(\"..\") "
             # emsg += "\nOtherwise, check with Dr. Knucklehead."
             # messagebox.showerror(" ",emsg)
-            imdl.fitdata = None
-            if (self.buttonSaveDes.winfo_ismapped()): self.buttonSaveDes.grid_forget()
+            gdata.fitdata = None
+            if (self.buttonSaveDes.winfo_ismapped()):
+                self.buttonSaveDes.grid_forget()
             return
         return
     
@@ -623,13 +640,13 @@ class RegressionApp(tk.Toplevel):
         return
     
     def showFit(self, *args):
-        grp.showFit(res = imdl.modelres, xname = self.clickedDependentX.get(), colorvar = self.clickedGC.get(), dsize = float(self.gpen.get()) )
+        grp.showFit(res = gdata.modelres, xname = self.clickedDependentX.get(), colorvar = self.clickedGC.get(), dsize = float(self.gpen.get()) )
         cstr = f"grp.showFit(res = res, xname = '{self.clickedDependentX.get()}', colorvar = '{self.clickedGC.get()}', dsize = {float(self.gpen.get())} )"
         gdata.code_It(cstr)
         return
     
     def dopredict(self, *args):
-        grp.dopredict(res = imdl.modelres, xname = self.clickedPredictX.get(), colorvar = self.clickedGC.get(), dsize = float(self.gpen.get()) )
+        grp.dopredict(res = gdata.modelres, xname = self.clickedPredictX.get(), colorvar = self.clickedGC.get(), dsize = float(self.gpen.get()) )
         cstr = f"grp.dopredict(res = res, xname = '{self.clickedPredictX.get()}', colorvar = '{self.clickedGC.get()}', dsize = {float(self.gpen.get())} )"
         gdata.code_It(cstr)
         return
@@ -640,22 +657,23 @@ class RegressionApp(tk.Toplevel):
             xnms = None
         else:
             xnms = xvresid
-        grp.doresidual(imdl.modelres, mtype = imdl.model_type, xname = xnms, 
+        grp.doresidual(gdata.modelres, mtype = gdata.model_type, xname = xnms, 
                     cvresid = self.clickedGC.get(), dsize = float(self.gpen.get()))
-        cstr=f"grp.doresidual(res = res, mtype = '{imdl.model_type}', xname = '{xnms}', cvresid = '{self.clickedGC.get()}', dsize = {float(self.gpen.get())})"
+        cstr=f"grp.doresidual(res = res, mtype = '{gdata.model_type}', xname = '{xnms}', cvresid = '{self.clickedGC.get()}', dsize = {float(self.gpen.get())})"
         gdata.code_It(cstr) 
         return
      
     def doroc(self, *args):
-        if (imdl.model_type not in  ['LOGIT', 'PROBIT']): 
+        if (gdata.model_type not in  ['LOGIT', 'PROBIT']): 
             return
-        if (imdl.fitdata is None): return
+        if (gdata.fitdata is None):
+            return
         gdata.code_It("grp.doroc(MODEL=res)")
-        prediction_res = imdl.modelres.get_prediction(transform = True)
+        prediction_res = gdata.modelres.get_prediction(transform = True)
         res_frame= prediction_res.summary_frame(alpha = 0.05)
 
-        #fpr, tpr, thresholds = roc_curve(imdl.fitdata[imdl.depvar], res_frame['mean']) 
-        fpr, tpr, thresholds = roc_curve(imdl.modelres.model.endog, res_frame['mean']) 
+        #fpr, tpr, thresholds = roc_curve(gdata.fitdata[gdata.depvar], res_frame['mean']) 
+        fpr, tpr, thresholds = roc_curve(gdata.modelres.model.endog, res_frame['mean']) 
         roc_auc = auc(fpr, tpr)
         fig = plt.figure(figsize = (8,8))
         ax = fig.add_subplot()
@@ -665,138 +683,89 @@ class RegressionApp(tk.Toplevel):
         ax.set_ylim([0.0, 1.05])
         ax.set_xlabel('False Positive Rate')
         ax.set_ylabel('True Positive Rate')
-        ax.set_title(f"ROC  Model: {imdl.model_string}, \nAUC={round(roc_auc,5)}")
+        ax.set_title(f"ROC  Model: {gdata.model_string}, \nAUC={round(roc_auc,5)}")
         fig.show()
         return
     
     def docorr(self, *args):
-        if (imdl.fitdata is None): return
-        corrvar0 = list(imdl.indvars)
-        corrvar0.insert(0,imdl.depvar)
-        sb.pairplot(imdl.fitdata[corrvar0])
+        if (gdata.fitdata is None):
+            return
+        corrvar0 = list(gdata.indvars)
+        corrvar0.insert(0,gdata.depvar)
+        sb.pairplot(gdata.fitdata[corrvar0])
         plt.show()
         return
     def doinfluence(self, *args):
-        influence_plot(imdl.modelres) 
+        influence_plot(gdata.modelres) 
         plt.show()
         return
     def doleverage(self, *args):
-        plot_leverage_resid2(imdl.modelres) 
+        plot_leverage_resid2(gdata.modelres) 
         plt.show()
         return
+
+
     def modelplot(self):
-        if (imdl.fitdata is None):
+        if (gdata.fitdata is None):
             messagebox.showerror(" ","You need to fit a model before you can plot a model. Not my rule, check with Dr. Knucklehead.")
             return
-        if len(imdl.indvars) == 1:
-            xv = list(imdl.indvars)[0]
-            if not(is_numeric_dtype(imdl.fitdata[xv])):
+        if len(gdata.indvars) == 1:
+            xv = list(gdata.indvars)[0]
+            if not(is_numeric_dtype(gdata.fitdata[xv])):
                 messagebox.showerror(" ",f"To display the model, all of the variables must be numerical. xv={xv}")
                 return
             yv = '-'
-            zv = imdl.depvar
-        elif len(imdl.indvars) == 2:
-            xv = list(imdl.indvars)[0]
-            yv = list(imdl.indvars)[1]
-            zv = imdl.depvar
-            if not(is_numeric_dtype(imdl.fitdata[xv]) & is_numeric_dtype(imdl.fitdata[yv]) & is_numeric_dtype(imdl.fitdata[zv])):
+            zv = gdata.depvar
+        elif len(gdata.indvars) == 2:
+            xv = list(gdata.indvars)[0]
+            yv = list(gdata.indvars)[1]
+            zv = gdata.depvar
+            if not (is_numeric_dtype(gdata.fitdata[xv]) and is_numeric_dtype(gdata.fitdata[yv]) and is_numeric_dtype(gdata.fitdata[zv])):
                 messagebox.showerror(" ",f"To display the model, all of the variables must be numerical. xv={xv}, yv={yv}, zv = {zv}")
                 return
         else:
             messagebox.showerror(' ',"I can only graph models with one or two independent variables.")    
             return
-        xvar, yvar, znew, Ci_lb1, Ci_ub1, Pi_lb1, Pi_ub1 = grp.doTrend(imdl.modelres, imdl.depvar, list(imdl.indvars),MTYPE=imdl.model_type)
+        cv = self.clickedGC.get()
+        bci = False
+        bpi = False
+        if self.selected_ci.get() == 1:
+            bci = True
+        if self.selected_pi.get() == 1:
+            bpi = True
         dsize = float(self.gpen.get())
-        if len(imdl.indvars)==1:
-            fig = plt.figure(figsize = (8,8)) 
-            ax = fig.add_subplot()
-            xv = list(imdl.indvars)[0]
-            zv = imdl.depvar
-            cv = self.clickedGC.get()
-            if cv == '-':
-                sb.scatterplot(imdl.fitdata, x = xv, y = zv, ax = ax,s = dsize, color = 'black')
-            else:
-                sb.scatterplot(imdl.fitdata, x = xv, y= zv, ax = ax, s = dsize, hue = cv, palette = 'bright' )
-            dftemp = pd.DataFrame({xv:xvar, zv:znew})
-            if (self.selected_response.get() == 1):
-                sb.lineplot(dftemp, x = xv, y = zv, ax = ax, color = 'red', linewidth = dsize/2)
-            if (self.selected_ci.get() == 1):
-                sb.lineplot(dftemp, x = xv, y = Ci_lb1, ax = ax, color = 'green', linewidth = dsize/2)
-                sb.lineplot(dftemp, x = xv, y = Ci_ub1, ax = ax, color = 'green', linewidth = dsize/2)
-            if (imdl.model_type == 'OLS') & (self.selected_pi.get() == 1):
-                sb.lineplot(dftemp, x = xv, y = Pi_lb1, ax = ax, color = 'blue', linewidth = dsize/2)
-                sb.lineplot(dftemp, x = xv, y = Pi_ub1, ax = ax, color = 'blue', linewidth = dsize/2)
-            fig.show()
-        elif len(imdl.indvars) == 2:
-            fig = plt.figure(figsize = (8,8))
-            ax = fig.add_subplot(111, projection='3d')
-            xv = list(imdl.indvars)[0]
-            yv = list(imdl.indvars)[1]
-            zv = imdl.depvar
-            cv = self.clickedGC.get()
-            xdat = imdl.fitdata[xv]
-            ydat = imdl.fitdata[yv]
-            zdat = imdl.fitdata[zv]
-            ax.set_xlabel(xv)
-            ax.set_ylabel(yv)
-            ax.set_zlabel(zv)
-            if (cv == '-') or (cv == ''):
-                ax.scatter(xdat, ydat, zdat ,marker='o', color = 'black', s = dsize)
-            else:
-                colordat = imdl.fitdata[cv]
-                colorD, colorlist ,lpatches= grp.getcolor(cv,list(colordat))
-                ax.scatter(xdat, ydat, zdat ,marker='o', c = colorlist, s = dsize)
-                if colorD != {}:
-                    handles , labels = ax.get_legend_handles_labels()
-                    handles.extend(lpatches)
-                    ax.legend(handles = handles)
-                    #for item in colorD.keys():
-                        #patch = mpatches.Patch(color = colorD[item], label = cv + ', ' + str(item))
-                        #handles.extend([patch])
-                        #ax.legend(handles = handles)                    
-            if (self.selected_response.get() == 1):
-                ax.plot_surface(xvar,yvar,znew, alpha = 0.8, color = 'cyan', edgecolor = 'grey')
-            if (self.selected_ci.get() == 1):
-                ax.plot_surface(xvar,yvar,Ci_ub1, alpha = 0.4, color ='goldenrod', edgecolor = 'grey')
-                ax.plot_surface(xvar,yvar,Ci_lb1, alpha = 0.4, color ='goldenrod', edgecolor = 'grey')            
-            if (imdl.model_type == 'OLS') & (self.selected_pi.get() == 1):
-                ax.plot_surface(xvar,yvar,Pi_ub1, alpha = 0.2, color = 'magenta', edgecolor = 'grey')                
-                ax.plot_surface(xvar,yvar,Pi_lb1, alpha = 0.2, color = 'magenta', edgecolor = 'grey')                
-            fig.show()        
-        else:
-            return
-        cib=False
-        pib=False
-        if self.selected_ci.get() == 1: cib = True
-        if self.selected_pi.get() == 1: pib = True
-
-        cstr = f"grp.modelplot(res, depvar = '{imdl.depvar}', indvars = {list(imdl.indvars)},color_var = '{self.clickedGC.get()}', showCI = {cib}, showPI = {pib}, MTYPE = '{imdl.model_type}')"
+        grp.modelplot(gdata.modelres, depvar = zv, indvars = gdata.indvars, color_var = cv, 
+                       showCI = bci, showPI = bpi, MTYPE = gdata.model_type, dsize = dsize)
+        cstr = f"grp.modelplot(res, depvar = '{gdata.depvar}', indvars = {list(gdata.indvars)},color_var = '{self.clickedGC.get()}',"
+        cstr += f" showCI = {bci}, showPI = {bpi}, MTYPE = '{gdata.model_type}', dsize = {dsize})"
         gdata.code_It(cstr)
         return
+
+
     def exit_closing(self):
         plt.close('all')
-        imdl.modelData_Clear()
+        gdata.modelData_Clear()
         self.destroy()
         
     def saveDes(self, *args):
         file_path = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes=[('Text Files', '*.txt'), ('All Files', '*.*'), ('CSV Files', '*.csv')],
-            initialfile = f"DG_Fitted_{datetime.now().strftime("%Y-%m-%d@%H-%M-%S")}.csv"
+            initialfile = f"DG_Fitted_{datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}.csv"
         )
         if file_path.endswith(('.csv','.CSV')):
-            imdl.fitdata.to_csv(file_path)
+            gdata.fitdata.to_csv(file_path)
         elif file_path.endswith(('.dta','.DTA')):
-            imdl.fitdata.to_stata(file_path)
+            gdata.fitdata.to_stata(file_path)
         return
     
     
     def saveDmatOnly(self, *args):
-        depv, dfrm = dmatrices(imdl.model_string, imdl.inputdata, return_type = 'dataframe', NA_action=NAAction(NA_types=[]))
+        depv, dfrm = dmatrices(gdata.model_string, gdata.inputdata, return_type = 'dataframe', NA_action=NAAction(NA_types=[]))
         file_path = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes = [('CSV Files','*.csv')],
-            initialfile = f"DG_ModelInput_{datetime.now().strftime("%Y-%m-%d@%H-%M-%S")}.csv"
+            initialfile = f"DG_ModelInput_{datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}.csv"
         )
         data = pd.concat([depv, dfrm], axis=1)
         if file_path.endswith(('.csv','.CSV')):
@@ -823,7 +792,8 @@ if __name__ == "__main__":
             #gst = goPivot(self)
         
         def goModel(self,*args):
-            if len(gdata.data) == 0: return
+            if len(gdata.data) == 0:
+                return
             if self.modelOn:
                 self.gst.destroy()
             self.gst = RegressionApp()
@@ -833,7 +803,7 @@ if __name__ == "__main__":
                         
         def quit(self,*args):
             plt.close('all')
-            imdl.modelData_Clear()
+            gdata.modelData_Clear()
             self.destroy()
             self.modelOn = False
             return 
@@ -850,7 +820,7 @@ if __name__ == "__main__":
                 gdata.reset_Data(file_path, df_in)
                 if self.modelOn:
                     #self.dstat.syncData()
-                    imdl.modelData_Clear()
+                    gdata.modelData_Clear()
                     self.gst.destroy()
                     plt.close('all')
                     self.gst = RegressionApp()

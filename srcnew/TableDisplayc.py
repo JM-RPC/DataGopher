@@ -51,17 +51,17 @@ class DataFrameTreeView(tk.Frame):
         # Bind click event for sorting
         self.tree.bind("<Button-1>", self.handle_click)
 
-        # Sort order tracking
-        self.sort_order = {}
+        # # Sort order tracking
+        # self.sort_order = {}
 
-        # Bind click event for sorting
-        self.tree.bind("<Button-1>", self.handle_click)
+        # # Bind click event for sorting
+        # self.tree.bind("<Button-1>", self.handle_click)
 
 
 
 
     def do_display(self, dframe = pd.DataFrame()):
-        rows = len(dframe)
+        #rows = len(dframe)
         #if rows == 0:
             #return
        
@@ -135,9 +135,9 @@ class DataFrameTreeView(tk.Frame):
         if col not in self.sort_order:
             self.sort_order[col] = False
         reverse = self.sort_order[col]
-        l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
-        l.sort(reverse=reverse)
-        for index, (val, k) in enumerate(l):
+        lx = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
+        lx.sort(reverse=reverse)
+        for index, (val, k) in enumerate(lx):
             self.tree.move(k, '', index)
         self.sort_order[col] = not reverse
         
@@ -204,7 +204,8 @@ if __name__ == "__main__":
 
 
         def showData_3(self,*args):
-            if len(gdata.data) == 0: return
+            if len(gdata.data) == 0:
+                return
             self.dfdisp.do_display(gdata.data)
 
 
